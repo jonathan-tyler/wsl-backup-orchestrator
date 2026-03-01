@@ -15,6 +15,8 @@ type Profile struct {
 
 type File struct {
 	ResticVersion string             `yaml:"restic_version"`
+	KeepassDB     string             `yaml:"keepassxc_database"`
+	KeepassEntry  string             `yaml:"keepassxc_entry"`
 	Profiles      map[string]Profile `yaml:"profiles"`
 
 	path string

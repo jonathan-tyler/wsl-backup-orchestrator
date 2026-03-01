@@ -17,6 +17,17 @@ Thin, predictable wrapper around `restic`, run from WSL and usable as a `wsl-sys
 - Rule naming: `<profile>.<include|exclude>.<daily|weekly|monthly>.txt`
   - Rules are checked for filesystem overlap
 
+## Authentication
+
+- Restic password is a hard requirement and is loaded from KeepassXC via `keepassxc-cli` for each restic command.
+- Required config options:
+  - `keepassxc_database` (path to `.kdbx` database)
+  - `keepassxc_entry` (entry name containing Password)
+- Optional environment overrides:
+  - `WSL_BACKUP_KEEPASSXC_DATABASE`
+  - `WSL_BACKUP_KEEPASSXC_ENTRY`
+- If lookup fails (including locked database), the command fails fast with an error.
+
 ## Usage
 
 - This CLI is WSL-only; run it from a WSL shell (not from native Windows or a Dev Container).
@@ -47,6 +58,12 @@ backup restore /tmp/restore-target --dry-run
 ```sh
 BACKUP_CONFIG=/path/to/config.yaml backup setup
 BACKUP_CONFIG=/path/to/config.yaml backup run daily
+
+# Optional KeepassXC overrides (config remains the default source)
+WSL_BACKUP_KEEPASSXC_DATABASE=/path/to/vault.kdbx \
+WSL_BACKUP_KEEPASSXC_ENTRY=restic/main \
+BACKUP_CONFIG=/path/to/config.yaml \
+backup run daily
 ```
 
 - Missing rules behavior:

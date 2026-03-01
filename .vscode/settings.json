@@ -24,6 +24,7 @@
         "staticcheck": true
     },
     "chat.tools.terminal.autoApprove": {
-        "gofmt": true
+        "gofmt": true,
+        "go": true
     }
 }

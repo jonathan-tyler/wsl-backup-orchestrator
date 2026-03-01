@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -29,13 +30,36 @@ func (r OSRunner) Run(ctx context.Context, args ...string) error {
 		return fmt.Errorf("restic command requires at least one argument")
 	}
 
+	password, err := loadResticPassword(ctx, r.stdout, r.stderr)
+	if err != nil {
+		return err
+	}
+
 	fmt.Fprintf(r.stdout, "$ restic %s\n", formatCommand(args))
 
 	cmd := commandContext(ctx, "restic", args...)
+	baseEnv := cmd.Env
+	if len(baseEnv) == 0 {
+		baseEnv = os.Environ()
+	}
+	cmd.Env = withResticPassword(baseEnv, password)
 	cmd.Stdout = r.stdout
 	cmd.Stderr = r.stderr
 
 	return cmd.Run()
+}
+
+func withResticPassword(base []string, password string) []string {
+	result := make([]string, 0, len(base)+1)
+	prefix := "RESTIC_PASSWORD="
+	for _, item := range base {
+		if strings.HasPrefix(item, prefix) {
+			continue
+		}
+		result = append(result, item)
+	}
+
+	return append(result, prefix+password)
 }
 
 func formatCommand(args []string) string {

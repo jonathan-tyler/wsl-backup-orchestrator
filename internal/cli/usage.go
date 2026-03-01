@@ -17,6 +17,8 @@ Commands:
   restore  Restore latest snapshot to a target directory
 
 Environment:
-  BACKUP_CONFIG  Optional config file path override
+  BACKUP_CONFIG                  Optional config file path override
+  WSL_BACKUP_KEEPASSXC_DATABASE  Optional KeepassXC database path override
+  WSL_BACKUP_KEEPASSXC_ENTRY     Optional KeepassXC entry override for restic password
 `)
 }
