@@ -37,6 +37,8 @@ type Router struct {
 }
 
 func (r Router) Route(ctx context.Context, args []string) int {
+	args = normalizeArgs(args)
+
 	if len(args) == 0 {
 		printUsage(r.Stderr)
 		return 2
@@ -93,6 +95,13 @@ func (r Router) Route(ctx context.Context, args []string) int {
 		printUsage(r.Stderr)
 		return 2
 	}
+}
+
+func normalizeArgs(args []string) []string {
+	if len(args) > 0 && args[0] == "backup" {
+		return args[1:]
+	}
+	return args
 }
 
 func (r Router) renderError(err error) int {

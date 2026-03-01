@@ -65,6 +65,23 @@ func TestRouteUnknownCommand(t *testing.T) {
 	}
 }
 
+func TestRouteAcceptsLeadingBackupToken(t *testing.T) {
+	var stdout strings.Builder
+	var stderr strings.Builder
+	runner := &fakeRunner{}
+	r := Router{Stdout: &stdout, Stderr: &stderr, Runner: runner, Run: func(ctx context.Context, args []string, execRunner restic.Executor) error {
+		return execRunner.Run(ctx, "backup", "--tag", "cadence=daily")
+	}}
+
+	code := r.Route(context.Background(), []string{"backup", "run", "daily"})
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if !runner.called {
+		t.Fatalf("expected runner call via normalized args")
+	}
+}
+
 func TestRouteRunDispatchesToRunner(t *testing.T) {
 	var stdout strings.Builder
 	var stderr strings.Builder
