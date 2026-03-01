@@ -65,6 +65,10 @@ func HandleWith(ctx context.Context, args []string, runner restic.Executor, deps
 		return err
 	}
 
+	if err := validateIncludeRuleOverlap(cfg.Dir(), cadence, cfg.Profiles, os.ReadFile); err != nil {
+		return err
+	}
+
 	profileNames := sortedProfileNames(cfg.Profiles)
 	if len(profileNames) == 0 {
 		return fmt.Errorf("no profiles configured")
@@ -86,7 +90,7 @@ func HandleWith(ctx context.Context, args []string, runner restic.Executor, deps
 				return
 			}
 
-			if err := runner.Run(ctx, resticArgs...); err != nil {
+			if err := executeProfileBackup(ctx, profileName, resticArgs, runner, deps.System); err != nil {
 				errCh <- fmt.Errorf("profile %s: %w", profileName, err)
 			}
 		}()
