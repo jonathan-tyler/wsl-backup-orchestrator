@@ -1,0 +1,41 @@
+{
+    "name": "backup",
+    "build": {
+        "dockerfile": "Containerfile",
+        "context": "..",
+        "target": "project"
+    },
+    "remoteUser": "developer",
+    "containerUser": "developer",
+    "updateRemoteUserUID": true,
+    "runArgs": [
+        "--name=${localWorkspaceFolderBasename}-dev",
+        "--userns=keep-id",
+        "--security-opt=no-new-privileges"
+    ],
+    // These paths are relative to the wsl-sys-cli parent repo
+    "workspaceFolder": "/workspace/linux/backup",
+    "workspaceMount": "source=${localWorkspaceFolder}/../..,target=/workspace,type=bind",
+    "mounts": [
+        "type=volume,target=/home/developer/.cache",
+        "type=volume,target=/home/developer/go",
+        // Host WSL backup config dir bind-mounted for real config editing/testing.
+        "type=bind,source=${localEnv:HOME}/.config/backup,target=/home/developer/.config/backup",
+        "type=bind,source=${localEnv:HOME}/.agents,target=${containerWorkspaceFolder}/.agents",
+        // Use less restrictive agent allowances only inside dev containers
+        "type=bind,source=${localEnv:HOME}/.agents/skills/dev-containers/assets/settings.json,target=/home/developer/.vscode-server/data/Machine/settings.json",
+        // Mount shell history, then copy to allow it to grow within the container
+        "type=bind,source=${localEnv:HOME}/.agents/skills/dev-containers/assets/.zsh_history,target=/tmp/.zsh_history,readonly",
+        // Optional: personal starship configuration
+        "type=bind,source=${localEnv:HOME}/.config/starship.toml,target=/home/developer/.config/starship.toml,readonly"
+    ],
+    "postCreateCommand": "[ -f /tmp/.zsh_history ] && cp /tmp/.zsh_history /home/developer/.zsh_history || true; mkdir -p ${containerWorkspaceFolder}/.agents/local-skills",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "davidanson.vscode-markdownlint",
+                "golang.go"
+            ]
+        }
+    }
+}
