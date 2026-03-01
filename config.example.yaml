@@ -1,0 +1,15 @@
+# Copy to ~/.config/backup/config.yaml (WSL/Linux)
+# or %APPDATA%\backup\config.yaml (Windows).
+#
+# This sample is used by the installer scaffold and as a starting point.
+# Daily runs can execute backups when config is present and valid.
+
+restic_version: "0.18.1"
+profiles:
+  wsl:
+    repository: /path/to/restic-repo
+    use_fs_snapshot: false
+
+  windows:
+    repository: C:\\path\\to\\restic-repo
+    use_fs_snapshot: true

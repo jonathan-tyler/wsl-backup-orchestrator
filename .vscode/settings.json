@@ -1,0 +1,29 @@
+{
+    "[go]": {
+        "editor.defaultFormatter": "golang.go",
+        "editor.formatOnSave": true
+    },
+    "go.formatTool": "goimports",
+    "go.useLanguageServer": true,
+    "go.testFlags": [
+        "-count=1"
+    ],
+    "gopls": {
+        "ui.inlayhint.hints": {
+            "assignVariableTypes": true,
+            "compositeLiteralFields": true,
+            "constantValues": true,
+            "functionTypeParameters": true,
+            "parameterNames": true,
+            "rangeVariableTypes": true
+        },
+        "analyses": {
+            "unusedparams": true,
+            "shadow": true
+        },
+        "staticcheck": true
+    },
+    "chat.tools.terminal.autoApprove": {
+        "gofmt": true
+    }
+}
