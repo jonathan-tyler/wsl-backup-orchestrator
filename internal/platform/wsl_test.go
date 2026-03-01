@@ -21,3 +21,10 @@ func TestValidateFailsOutsideWSL(t *testing.T) {
 		t.Fatalf("expected error")
 	}
 }
+
+func TestValidateFailsWhenGetenvIsNil(t *testing.T) {
+	guard := WSLGuard{}
+	if err := guard.Validate(); err == nil {
+		t.Fatalf("expected error")
+	}
+}

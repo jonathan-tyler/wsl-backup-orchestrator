@@ -157,6 +157,78 @@ func TestOSRunnerFailsWhenKeepassLookupFails(t *testing.T) {
 	}
 }
 
+func TestWithResticPasswordReplacesExistingValue(t *testing.T) {
+	base := []string{"PATH=/usr/bin", "RESTIC_PASSWORD=old", "HOME=/tmp"}
+	updated := withResticPassword(base, "new-secret")
+
+	if strings.Count(strings.Join(updated, "|"), "RESTIC_PASSWORD=") != 1 {
+		t.Fatalf("expected exactly one RESTIC_PASSWORD entry, got %#v", updated)
+	}
+	if updated[len(updated)-1] != "RESTIC_PASSWORD=new-secret" {
+		t.Fatalf("expected appended replacement password, got %#v", updated)
+	}
+}
+
+func TestOSRunnerFailsWhenKeepassReturnsEmptyPassword(t *testing.T) {
+	original := commandContext
+	commandContext = fakeExecCommand
+	t.Cleanup(func() {
+		commandContext = original
+	})
+
+	t.Setenv(KeepassDatabaseEnv, "/tmp/vault.kdbx")
+	t.Setenv(KeepassEntryEnv, "restic/main")
+	t.Setenv("FAKE_KEEPASS_EMPTY", "1")
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	runner := NewOSRunner(&stdout, &stderr)
+
+	err := runner.Run(context.Background(), "snapshots")
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(err.Error(), "returned an empty password") {
+		t.Fatalf("expected empty-password error, got %v", err)
+	}
+}
+
+func TestResolveKeepassLookupSettingsUsesConfig(t *testing.T) {
+	configPath := writeConfigFile(t, `restic_version: "0.18.1"
+keepassxc_database: /tmp/config-vault.kdbx
+keepassxc_entry: config/restic
+profiles:
+  wsl:
+    repository: /repo/wsl
+    use_fs_snapshot: false
+`)
+	t.Setenv("BACKUP_CONFIG", configPath)
+	t.Setenv(KeepassDatabaseEnv, "")
+	t.Setenv(KeepassEntryEnv, "")
+
+	database, entry, err := resolveKeepassLookupSettings()
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if database != "/tmp/config-vault.kdbx" || entry != "config/restic" {
+		t.Fatalf("unexpected lookup settings: database=%q entry=%q", database, entry)
+	}
+}
+
+func TestResolveKeepassLookupSettingsFailsWithPartialEnvAndMissingConfig(t *testing.T) {
+	t.Setenv("BACKUP_CONFIG", "/tmp/does-not-exist-config.yaml")
+	t.Setenv(KeepassDatabaseEnv, "/tmp/env-vault.kdbx")
+	t.Setenv(KeepassEntryEnv, "")
+
+	_, _, err := resolveKeepassLookupSettings()
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(err.Error(), "unable to complete KeepassXC lookup settings from config") {
+		t.Fatalf("expected partial-env config-completion error, got %v", err)
+	}
+}
+
 func writeConfigFile(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -190,6 +262,10 @@ func TestHelperProcess(t *testing.T) {
 		if os.Getenv("FAKE_KEEPASS_FAIL") == "1" {
 			fmt.Fprintln(os.Stderr, "database is locked")
 			os.Exit(1)
+		}
+		if os.Getenv("FAKE_KEEPASS_EMPTY") == "1" {
+			fmt.Fprintln(os.Stdout)
+			os.Exit(0)
 		}
 
 		fmt.Fprintln(os.Stdout, "test-password")

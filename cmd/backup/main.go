@@ -6,6 +6,11 @@ import (
 	"github.com/jonathan-tyler/wsl-backup-restic/internal/cli"
 )
 
+var (
+	cliMain = cli.Main
+	exitFunc = os.Exit
+)
+
 func main() {
-	os.Exit(cli.Main(os.Args[1:], os.Stdout, os.Stderr))
+	exitFunc(cliMain(os.Args[1:], os.Stdout, os.Stderr))
 }

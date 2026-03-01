@@ -2,6 +2,7 @@ package resticversion
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -75,5 +76,157 @@ func TestSyncInteractiveWithReportReturnsWindowsFailedStatusOnDecline(t *testing
 	}
 	if report.Items[0].Status != SetupFailed {
 		t.Fatalf("expected failed status, got %s", report.Items[0].Status)
+	}
+}
+
+func TestSyncWindowsInteractiveMissingConfirmError(t *testing.T) {
+	exec := &fakeSystemExecutor{
+		captureErr: map[string]error{
+			"powershell.exe -NoProfile -Command restic version": errors.New("not found"),
+		},
+	}
+
+	_, err := syncWindowsInteractive(context.Background(), "0.18.1", exec, func(string) (bool, error) {
+		return false, errors.New("prompt failed")
+	})
+
+	if err == nil || !strings.Contains(err.Error(), "prompt failed") {
+		t.Fatalf("expected prompt failure, got %v", err)
+	}
+}
+
+func TestSyncWindowsInteractiveMissingDeclined(t *testing.T) {
+	exec := &fakeSystemExecutor{
+		captureErr: map[string]error{
+			"powershell.exe -NoProfile -Command restic version": errors.New("not found"),
+		},
+	}
+
+	report, err := syncWindowsInteractive(context.Background(), "0.18.1", exec, func(string) (bool, error) {
+		return false, nil
+	})
+
+	if err == nil || !strings.Contains(err.Error(), "required") {
+		t.Fatalf("expected required error, got %v", err)
+	}
+	if report.Status != SetupFailed {
+		t.Fatalf("expected failed status, got %s", report.Status)
+	}
+}
+
+func TestSyncWindowsInteractiveInstallFailure(t *testing.T) {
+	exec := &fakeSystemExecutor{
+		captureErr: map[string]error{
+			"powershell.exe -NoProfile -Command restic version": errors.New("not found"),
+		},
+		runErr: map[string]error{
+			"powershell.exe -NoProfile -Command scoop install restic": errors.New("install fail"),
+		},
+	}
+
+	report, err := syncWindowsInteractive(context.Background(), "0.18.1", exec, func(string) (bool, error) {
+		return true, nil
+	})
+
+	if err == nil || !strings.Contains(err.Error(), "install fail") {
+		t.Fatalf("expected install failure, got %v", err)
+	}
+	if report.Status != SetupFailed {
+		t.Fatalf("expected failed status, got %s", report.Status)
+	}
+}
+
+func TestSyncWindowsInteractiveMissingInstallSuccess(t *testing.T) {
+	exec := &fakeSystemExecutor{
+		captureErr: map[string]error{
+			"powershell.exe -NoProfile -Command restic version": errors.New("not found"),
+		},
+	}
+
+	report, err := syncWindowsInteractive(context.Background(), "0.18.1", exec, func(string) (bool, error) {
+		return true, nil
+	})
+
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if report.Status != SetupInstalled {
+		t.Fatalf("expected installed status, got %s", report.Status)
+	}
+}
+
+func TestSyncWindowsInteractiveParseFailure(t *testing.T) {
+	exec := &fakeSystemExecutor{
+		captureOutput: map[string]string{
+			"powershell.exe -NoProfile -Command restic version": "no version",
+		},
+	}
+
+	report, err := syncWindowsInteractive(context.Background(), "0.18.1", exec, func(string) (bool, error) {
+		return true, nil
+	})
+
+	if err == nil || !strings.Contains(err.Error(), "parse windows restic version") {
+		t.Fatalf("expected parse error, got %v", err)
+	}
+	if report.Status != SetupFailed {
+		t.Fatalf("expected failed status, got %s", report.Status)
+	}
+}
+
+func TestSyncWindowsInteractiveMismatchConfirmError(t *testing.T) {
+	exec := &fakeSystemExecutor{
+		captureOutput: map[string]string{
+			"powershell.exe -NoProfile -Command restic version": "restic 0.17.3 compiled with go1.24",
+		},
+	}
+
+	_, err := syncWindowsInteractive(context.Background(), "0.18.1", exec, func(string) (bool, error) {
+		return false, errors.New("prompt failed")
+	})
+
+	if err == nil || !strings.Contains(err.Error(), "prompt failed") {
+		t.Fatalf("expected prompt failure, got %v", err)
+	}
+}
+
+func TestSyncWindowsInteractiveMismatchUpdateFailure(t *testing.T) {
+	exec := &fakeSystemExecutor{
+		captureOutput: map[string]string{
+			"powershell.exe -NoProfile -Command restic version": "restic 0.17.3 compiled with go1.24",
+		},
+		runErr: map[string]error{
+			"powershell.exe -NoProfile -Command scoop update restic": errors.New("update fail"),
+		},
+	}
+
+	report, err := syncWindowsInteractive(context.Background(), "0.18.1", exec, func(string) (bool, error) {
+		return true, nil
+	})
+
+	if err == nil || !strings.Contains(err.Error(), "update fail") {
+		t.Fatalf("expected update failure, got %v", err)
+	}
+	if report.Status != SetupFailed {
+		t.Fatalf("expected failed status, got %s", report.Status)
+	}
+}
+
+func TestSyncWindowsInteractiveMismatchUpdateSuccess(t *testing.T) {
+	exec := &fakeSystemExecutor{
+		captureOutput: map[string]string{
+			"powershell.exe -NoProfile -Command restic version": "restic 0.17.3 compiled with go1.24",
+		},
+	}
+
+	report, err := syncWindowsInteractive(context.Background(), "0.18.1", exec, func(string) (bool, error) {
+		return true, nil
+	})
+
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if report.Status != SetupUpdated {
+		t.Fatalf("expected updated status, got %s", report.Status)
 	}
 }

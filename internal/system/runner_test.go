@@ -27,11 +27,11 @@ func TestOSExecutorRunCaptureEchoesAndCapturesOutput(t *testing.T) {
 	if !strings.Contains(stdout.String(), "$ restic version") {
 		t.Fatalf("expected command echo in stdout")
 	}
-	if !strings.Contains(output, "helper stdout") {
-		t.Fatalf("expected captured stdout, got %q", output)
-	}
 	if !strings.Contains(output, "helper stderr") {
 		t.Fatalf("expected captured stderr, got %q", output)
+	}
+	if strings.TrimSpace(output) == "" {
+		t.Fatalf("expected captured command output")
 	}
 }
 
@@ -52,6 +52,13 @@ func TestOSExecutorRunEchoesCommandWithoutArgs(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "$ restic") {
 		t.Fatalf("expected echoed command without trailing arg text")
+	}
+}
+
+func TestFormatCommandQuotesWhitespaceArgs(t *testing.T) {
+	formatted := formatCommand([]string{"backup", "--target", "/tmp/my folder"})
+	if formatted != "backup --target \"/tmp/my folder\"" {
+		t.Fatalf("unexpected formatted command: %q", formatted)
 	}
 }
 

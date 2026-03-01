@@ -78,3 +78,136 @@ func TestSyncInteractiveWithReportReturnsWSLMatchedStatus(t *testing.T) {
 		t.Fatalf("expected matched status, got %s", report.Items[0].Status)
 	}
 }
+
+func TestSyncWSLInteractiveMissingConfirmError(t *testing.T) {
+	exec := &fakeSystemExecutor{
+		captureErr: map[string]error{
+			"restic version": errors.New("not found"),
+		},
+	}
+
+	_, err := syncWSLInteractive(context.Background(), "0.18.1", exec, func(string) (bool, error) {
+		return false, errors.New("prompt failed")
+	})
+
+	if err == nil || !strings.Contains(err.Error(), "prompt failed") {
+		t.Fatalf("expected prompt failure, got %v", err)
+	}
+}
+
+func TestSyncWSLInteractiveMissingDeclined(t *testing.T) {
+	exec := &fakeSystemExecutor{
+		captureErr: map[string]error{
+			"restic version": errors.New("not found"),
+		},
+	}
+
+	report, err := syncWSLInteractive(context.Background(), "0.18.1", exec, func(string) (bool, error) {
+		return false, nil
+	})
+
+	if err == nil || !strings.Contains(err.Error(), "required") {
+		t.Fatalf("expected required error, got %v", err)
+	}
+	if report.Status != SetupFailed {
+		t.Fatalf("expected failed status, got %s", report.Status)
+	}
+}
+
+func TestSyncWSLInteractiveInstallFailure(t *testing.T) {
+	exec := &fakeSystemExecutor{
+		captureErr: map[string]error{
+			"restic version": errors.New("not found"),
+		},
+		runErr: map[string]error{
+			"sudo dnf install -y restic": errors.New("install fail"),
+		},
+	}
+
+	report, err := syncWSLInteractive(context.Background(), "0.18.1", exec, func(string) (bool, error) {
+		return true, nil
+	})
+
+	if err == nil || !strings.Contains(err.Error(), "install fail") {
+		t.Fatalf("expected install failure, got %v", err)
+	}
+	if report.Status != SetupFailed {
+		t.Fatalf("expected failed status, got %s", report.Status)
+	}
+}
+
+func TestSyncWSLInteractiveParseFailure(t *testing.T) {
+	exec := &fakeSystemExecutor{
+		captureOutput: map[string]string{
+			"restic version": "not a version",
+		},
+	}
+
+	report, err := syncWSLInteractive(context.Background(), "0.18.1", exec, func(string) (bool, error) {
+		return true, nil
+	})
+
+	if err == nil || !strings.Contains(err.Error(), "parse wsl restic version") {
+		t.Fatalf("expected parse error, got %v", err)
+	}
+	if report.Status != SetupFailed {
+		t.Fatalf("expected failed status, got %s", report.Status)
+	}
+}
+
+func TestSyncWSLInteractiveMismatchConfirmError(t *testing.T) {
+	exec := &fakeSystemExecutor{
+		captureOutput: map[string]string{
+			"restic version": "restic 0.17.3 compiled with go1.24",
+		},
+	}
+
+	_, err := syncWSLInteractive(context.Background(), "0.18.1", exec, func(string) (bool, error) {
+		return false, errors.New("prompt failed")
+	})
+
+	if err == nil || !strings.Contains(err.Error(), "prompt failed") {
+		t.Fatalf("expected prompt failure, got %v", err)
+	}
+}
+
+func TestSyncWSLInteractiveMismatchUpgradeFailure(t *testing.T) {
+	exec := &fakeSystemExecutor{
+		captureOutput: map[string]string{
+			"restic version": "restic 0.17.3 compiled with go1.24",
+		},
+		runErr: map[string]error{
+			"sudo dnf upgrade -y restic": errors.New("upgrade fail"),
+		},
+	}
+
+	report, err := syncWSLInteractive(context.Background(), "0.18.1", exec, func(string) (bool, error) {
+		return true, nil
+	})
+
+	if err == nil || !strings.Contains(err.Error(), "upgrade fail") {
+		t.Fatalf("expected upgrade failure, got %v", err)
+	}
+	if report.Status != SetupFailed {
+		t.Fatalf("expected failed status, got %s", report.Status)
+	}
+}
+
+func TestSyncWSLInteractiveMismatchUpgradeSuccess(t *testing.T) {
+	exec := &fakeSystemExecutor{
+		captureOutput: map[string]string{
+			"restic version": "restic 0.17.3 compiled with go1.24",
+		},
+	}
+
+	report, err := syncWSLInteractive(context.Background(), "0.18.1", exec, func(string) (bool, error) {
+		return true, nil
+	})
+
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if report.Status != SetupUpgraded {
+		t.Fatalf("expected upgraded status, got %s", report.Status)
+	}
+}

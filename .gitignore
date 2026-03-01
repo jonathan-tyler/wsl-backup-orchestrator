@@ -6,6 +6,7 @@ out/
 
 # Go test coverage and profiling
 coverage.out
+coverage*.out
 *.prof
 
 # Go modules cache and workspace files

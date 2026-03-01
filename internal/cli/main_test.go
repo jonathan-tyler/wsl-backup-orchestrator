@@ -201,3 +201,29 @@ func TestRouteRejectsUnsupportedEnvironment(t *testing.T) {
 		t.Fatalf("expected environment error output")
 	}
 }
+
+func TestMainHelpReturnsZero(t *testing.T) {
+	var stdout strings.Builder
+	var stderr strings.Builder
+
+	code := Main([]string{"help"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if !strings.Contains(stdout.String(), "Usage:") {
+		t.Fatalf("expected usage on stdout")
+	}
+}
+
+func TestMainNoArgsReturnsUsageError(t *testing.T) {
+	var stdout strings.Builder
+	var stderr strings.Builder
+
+	code := Main(nil, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(stderr.String(), "Usage:") {
+		t.Fatalf("expected usage on stderr")
+	}
+}

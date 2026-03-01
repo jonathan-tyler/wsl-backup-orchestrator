@@ -2,9 +2,50 @@ package config
 
 import (
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestFileDirAndPath(t *testing.T) {
+	var cfg File
+	if cfg.Path() != "" {
+		t.Fatalf("expected empty path")
+	}
+	if cfg.Dir() != "" {
+		t.Fatalf("expected empty dir")
+	}
+
+	withPath := FileWithPathForTest(cfg, "/tmp/wsl-backup/config.yaml")
+	if withPath.Path() != "/tmp/wsl-backup/config.yaml" {
+		t.Fatalf("unexpected path: %q", withPath.Path())
+	}
+	if withPath.Dir() != "/tmp/wsl-backup" {
+		t.Fatalf("unexpected dir: %q", withPath.Dir())
+	}
+}
+
+func TestIncludeAndExcludeRulesPath(t *testing.T) {
+	include := IncludeRulesPath("/tmp/wsl-backup", "wsl", "daily")
+	exclude := ExcludeRulesPath("/tmp/wsl-backup", "windows", "weekly")
+
+	if include != filepath.Join("/tmp/wsl-backup", "wsl.include.daily.txt") {
+		t.Fatalf("unexpected include path: %q", include)
+	}
+	if exclude != filepath.Join("/tmp/wsl-backup", "windows.exclude.weekly.txt") {
+		t.Fatalf("unexpected exclude path: %q", exclude)
+	}
+}
+
+func TestNewLoaderProvidesFunctions(t *testing.T) {
+	loader := NewLoader()
+	if loader.ReadFile == nil {
+		t.Fatalf("expected ReadFile function")
+	}
+	if loader.Getenv == nil {
+		t.Fatalf("expected Getenv function")
+	}
+}
 
 func TestResolvePathUsesOverride(t *testing.T) {
 	loader := Loader{Getenv: func(key string) string {
@@ -152,6 +193,52 @@ func TestLoadWrapsReadError(t *testing.T) {
 		t.Fatalf("expected error")
 	}
 	if !strings.Contains(err.Error(), "read fail") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLoadWrapsParseError(t *testing.T) {
+	loader := Loader{
+		Getenv: func(key string) string {
+			if key == "BACKUP_CONFIG" {
+				return "/tmp/config.yaml"
+			}
+			return ""
+		},
+		ReadFile: func(string) ([]byte, error) {
+			return []byte("profiles: ["), nil
+		},
+	}
+
+	_, err := loader.Load()
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(err.Error(), "parse config") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLoadFailsWhenNoProfiles(t *testing.T) {
+	loader := Loader{
+		Getenv: func(key string) string {
+			if key == "BACKUP_CONFIG" {
+				return "/tmp/config.yaml"
+			}
+			return ""
+		},
+		ReadFile: func(string) ([]byte, error) {
+			return []byte(`restic_version: "0.18.1"
+profiles: {}
+`), nil
+		},
+	}
+
+	_, err := loader.Load()
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(err.Error(), "config has no profiles") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

@@ -3,6 +3,7 @@ package setup
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/jonathan-tyler/wsl-backup-restic/internal/apperr"
@@ -23,25 +24,42 @@ type Dependencies struct {
 	Confirm prompt.ConfirmFunc
 }
 
+var (
+	setupStdout io.Writer = os.Stdout
+	setupStderr io.Writer = os.Stderr
+	setupStdin  io.Reader = os.Stdin
+
+	newConfigLoader = func() ConfigLoader {
+		return config.NewLoader()
+	}
+	newSystemExecutor = func(stdout io.Writer, stderr io.Writer) system.Executor {
+		return system.NewOSExecutor(stdout, stderr)
+	}
+	newConfirmFunc = func(input io.Reader, output io.Writer) prompt.ConfirmFunc {
+		return prompt.NewYesNoConfirm(input, output)
+	}
+	handleWithReportFunc = handleWithReport
+)
+
 func Handle(ctx context.Context, args []string, _ restic.Executor) error {
 	if len(args) != 0 {
 		return apperr.UsageError{Message: "setup does not take positional arguments"}
 	}
 
-	fmt.Fprintln(os.Stdout, "Running backup setup checks and installers...")
+	fmt.Fprintln(setupStdout, "Running backup setup checks and installers...")
 
 	deps := Dependencies{
-		Loader:  config.NewLoader(),
-		System:  system.NewOSExecutor(os.Stdout, os.Stderr),
-		Confirm: prompt.NewYesNoConfirm(os.Stdin, os.Stdout),
+		Loader:  newConfigLoader(),
+		System:  newSystemExecutor(setupStdout, setupStderr),
+		Confirm: newConfirmFunc(setupStdin, setupStdout),
 	}
 
-	report, err := handleWithReport(ctx, deps)
+	report, err := handleWithReportFunc(ctx, deps)
 	printSetupReport(report)
 	if err == nil {
-		fmt.Fprintln(os.Stdout, "Backup setup completed successfully.")
+		fmt.Fprintln(setupStdout, "Backup setup completed successfully.")
 	} else {
-		fmt.Fprintf(os.Stdout, "Backup setup failed: %v\n", err)
+		fmt.Fprintf(setupStdout, "Backup setup failed: %v\n", err)
 	}
 	return err
 }
@@ -53,10 +71,10 @@ func HandleWith(ctx context.Context, deps Dependencies) error {
 
 func handleWithReport(ctx context.Context, deps Dependencies) (resticversion.SetupReport, error) {
 	if deps.Loader == nil {
-		deps.Loader = config.NewLoader()
+		deps.Loader = newConfigLoader()
 	}
 	if deps.System == nil {
-		deps.System = system.NewOSExecutor(os.Stdout, os.Stderr)
+		deps.System = newSystemExecutor(setupStdout, setupStderr)
 	}
 	if deps.Confirm == nil {
 		deps.Confirm = func(string) (bool, error) { return false, nil }
@@ -72,12 +90,12 @@ func handleWithReport(ctx context.Context, deps Dependencies) (resticversion.Set
 
 func printSetupReport(report resticversion.SetupReport) {
 	if len(report.Items) == 0 {
-		fmt.Fprintln(os.Stdout, "setup report: no profile checks were executed")
+		fmt.Fprintln(setupStdout, "setup report: no profile checks were executed")
 		return
 	}
 
-	fmt.Fprintln(os.Stdout, "setup report:")
+	fmt.Fprintln(setupStdout, "setup report:")
 	for _, item := range report.Items {
-		fmt.Fprintf(os.Stdout, "- %s: %s (%s)\n", item.Platform, item.Status, item.Message)
+		fmt.Fprintf(setupStdout, "- %s: %s (%s)\n", item.Platform, item.Status, item.Message)
 	}
 }
