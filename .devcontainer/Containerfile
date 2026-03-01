@@ -10,6 +10,7 @@ RUN apt-get update \
     passwd \
     ca-certificates \
     git \
+    make \
     openssh-client \
     vim \
     && ldconfig \
