@@ -55,3 +55,26 @@ func TestSyncInteractiveInstallsWSLWhenMissingAndApproved(t *testing.T) {
 		t.Fatalf("unexpected install command: %s", exec.runCalls[0])
 	}
 }
+
+func TestSyncInteractiveWithReportReturnsWSLMatchedStatus(t *testing.T) {
+	exec := &fakeSystemExecutor{
+		captureOutput: map[string]string{
+			"restic version": "restic 0.18.1 compiled with go1.24",
+		},
+	}
+
+	report, err := SyncInteractiveWithReport(context.Background(), config.File{
+		ResticVersion: "0.18.1",
+		Profiles:      map[string]config.Profile{"wsl": {Repository: "/repo/wsl"}},
+	}, exec, func(string) (bool, error) { return true, nil })
+
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if len(report.Items) != 1 {
+		t.Fatalf("expected 1 report item, got %d", len(report.Items))
+	}
+	if report.Items[0].Status != SetupMatched {
+		t.Fatalf("expected matched status, got %s", report.Items[0].Status)
+	}
+}

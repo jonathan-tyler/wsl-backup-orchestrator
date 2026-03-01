@@ -2,7 +2,7 @@ package setup
 
 import (
 	"context"
-	"io"
+	"fmt"
 	"os"
 
 	"github.com/example/wsl-backup/internal/apperr"
@@ -28,21 +28,35 @@ func Handle(ctx context.Context, args []string, _ restic.Executor) error {
 		return apperr.UsageError{Message: "setup does not take positional arguments"}
 	}
 
+	fmt.Fprintln(os.Stdout, "Running backup setup checks and installers...")
+
 	deps := Dependencies{
 		Loader:  config.NewLoader(),
 		System:  system.NewOSExecutor(os.Stdout, os.Stderr),
 		Confirm: prompt.NewYesNoConfirm(os.Stdin, os.Stdout),
 	}
 
-	return HandleWith(ctx, deps)
+	report, err := handleWithReport(ctx, deps)
+	printSetupReport(report)
+	if err == nil {
+		fmt.Fprintln(os.Stdout, "Backup setup completed successfully.")
+	} else {
+		fmt.Fprintf(os.Stdout, "Backup setup failed: %v\n", err)
+	}
+	return err
 }
 
 func HandleWith(ctx context.Context, deps Dependencies) error {
+	_, err := handleWithReport(ctx, deps)
+	return err
+}
+
+func handleWithReport(ctx context.Context, deps Dependencies) (resticversion.SetupReport, error) {
 	if deps.Loader == nil {
 		deps.Loader = config.NewLoader()
 	}
 	if deps.System == nil {
-		deps.System = system.NewOSExecutor(io.Discard, io.Discard)
+		deps.System = system.NewOSExecutor(os.Stdout, os.Stderr)
 	}
 	if deps.Confirm == nil {
 		deps.Confirm = func(string) (bool, error) { return false, nil }
@@ -50,8 +64,20 @@ func HandleWith(ctx context.Context, deps Dependencies) error {
 
 	cfg, err := deps.Loader.Load()
 	if err != nil {
-		return err
+		return resticversion.SetupReport{}, err
 	}
 
-	return resticversion.SyncInteractive(ctx, cfg, deps.System, deps.Confirm)
+	return resticversion.SyncInteractiveWithReport(ctx, cfg, deps.System, deps.Confirm)
+}
+
+func printSetupReport(report resticversion.SetupReport) {
+	if len(report.Items) == 0 {
+		fmt.Fprintln(os.Stdout, "setup report: no profile checks were executed")
+		return
+	}
+
+	fmt.Fprintln(os.Stdout, "setup report:")
+	for _, item := range report.Items {
+		fmt.Fprintf(os.Stdout, "- %s: %s (%s)\n", item.Platform, item.Status, item.Message)
+	}
 }
