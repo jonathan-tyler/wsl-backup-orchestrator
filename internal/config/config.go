@@ -11,6 +11,7 @@ import (
 type Profile struct {
 	Repository    string `yaml:"repository"`
 	UseFSSnapshot bool   `yaml:"use_fs_snapshot"`
+	RunElevated   bool   `yaml:"run_elevated"`
 }
 
 type File struct {

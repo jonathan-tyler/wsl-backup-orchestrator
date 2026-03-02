@@ -13,3 +13,4 @@ profiles:
   windows:
     repository: C:\\path\\to\\restic-repo
     use_fs_snapshot: true
+    run_elevated: false

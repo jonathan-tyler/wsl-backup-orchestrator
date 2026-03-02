@@ -126,6 +126,10 @@ profiles:
   wsl:
     repository: /repo/wsl
     use_fs_snapshot: false
+  windows:
+    repository: C:\\repo\\windows
+    use_fs_snapshot: true
+    run_elevated: true
 `), nil
 		},
 	}
@@ -139,6 +143,9 @@ profiles:
 	}
 	if cfg.Profiles["wsl"].Repository != "/repo/wsl" {
 		t.Fatalf("unexpected repository")
+	}
+	if !cfg.Profiles["windows"].RunElevated {
+		t.Fatalf("expected windows run_elevated to be true")
 	}
 }
 

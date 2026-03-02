@@ -15,7 +15,8 @@ Thin, predictable wrapper around `restic`, run from WSL and usable as a `wsl-sys
 - Starter config: [config.example.yaml](config.example.yaml)
 - Rule file directory: `~/.config/wsl-backup/`
 - Rule naming: `<profile>.<include|exclude>.<daily|weekly|monthly>.txt`
-  - Rules are checked for filesystem overlap
+  - Include rules are checked for filesystem overlap
+  - Profile repositories are normalized and must be unique (for example, `/mnt/c/backups/repo` and `C:\\backups\\repo` are treated as the same target)
 
 ## Authentication
 
@@ -67,7 +68,7 @@ backup run daily
 - Missing rules behavior:
   - Missing include rule file (`<profile>.include.<cadence>.txt`) fails fast.
   - Missing exclude rule file (`<profile>.exclude.<cadence>.txt`) is allowed.
-  - Overlap across profiles in include or exclude rules fails fast.
+  - Overlap across profiles in include rules fails fast.
 
 - `backup restore <target> --dry-run` passes `--dry-run` to `restic restore` and performs a non-writing preview restore.
 - Additional restore args are forwarded after `--dry-run` (for example include/exclude filters).
@@ -78,3 +79,4 @@ backup run daily
 
 - `restic` stores symlinks as symlinks by default and does not follow them during backup. This behavior helps avoid recursive traversal from link loops. If symlink following is enabled explicitly in a restic invocation, traversal/loop risk must be evaluated separately.
 - On Windows profiles, enabling `use_fs_snapshot` passes `--use-fs-snapshot` to `restic`, which uses Volume Shadow Copy Service (VSS) snapshots for each volume involved in the backup. Data is read from those snapshots instead of the live filesystem, which helps include files that are locked by other running processes.
+- On Windows profiles, enabling `run_elevated` launches `restic.exe` through an elevated UAC prompt (`Start-Process -Verb RunAs`).

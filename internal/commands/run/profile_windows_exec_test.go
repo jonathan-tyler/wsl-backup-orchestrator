@@ -39,7 +39,7 @@ func TestExecuteWindowsProfileBackupRunsResticExe(t *testing.T) {
 		_ = os.Remove(filepath.Join(os.TempDir(), "wsl-backup-restic-password-000.txt"))
 	})
 
-	err := executeWindowsProfileBackup(context.Background(), args, fakeExec)
+	err := executeWindowsProfileBackup(context.Background(), args, false, fakeExec)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -93,11 +93,61 @@ func TestExecuteWindowsProfileBackupFailsWhenPasswordEmpty(t *testing.T) {
 	rulesDir := t.TempDir()
 	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.include.daily.txt")] = "C:\\rules\\windows.include.daily.txt"
 
-	err := executeWindowsProfileBackup(context.Background(), []string{"--repo", `C:\repo`, "backup", "--files-from", filepath.Join(rulesDir, "windows.include.daily.txt")}, fakeExec)
+	err := executeWindowsProfileBackup(context.Background(), []string{"--repo", `C:\repo`, "backup", "--files-from", filepath.Join(rulesDir, "windows.include.daily.txt")}, false, fakeExec)
 	if err == nil {
 		t.Fatalf("expected error")
 	}
 	if !strings.Contains(err.Error(), "restic password is empty") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExecuteWindowsProfileBackupRunsElevatedViaPowerShell(t *testing.T) {
+	originalLoad := loadWindowsProfilePassword
+	loadWindowsProfilePassword = func(context.Context) (string, error) {
+		return "test-password", nil
+	}
+	t.Cleanup(func() {
+		loadWindowsProfilePassword = originalLoad
+	})
+
+	fakeExec := &fakeSystem{runCapture: map[string]string{}}
+	rulesDir := t.TempDir()
+
+	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.include.daily.txt")] = "C:\\rules\\windows.include.daily.txt"
+	fakeExec.runCapture["wslpath -w "+filepath.Join(os.TempDir(), "wsl-backup-restic-password-111.txt")] = "C:\\Temp\\wsl-backup-restic-password-111.txt"
+	args := []string{"--repo", `C:\repo`, "backup", "--files-from", filepath.Join(rulesDir, "windows.include.daily.txt")}
+
+	originalCreateTemp := osCreateTemp
+	osCreateTemp = func(_ string, _ string) (*os.File, error) {
+		path := filepath.Join(os.TempDir(), "wsl-backup-restic-password-111.txt")
+		file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
+		if err != nil {
+			return nil, err
+		}
+		return file, nil
+	}
+	t.Cleanup(func() {
+		osCreateTemp = originalCreateTemp
+		_ = os.Remove(filepath.Join(os.TempDir(), "wsl-backup-restic-password-111.txt"))
+	})
+
+	err := executeWindowsProfileBackup(context.Background(), args, true, fakeExec)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	if len(fakeExec.runCalls) != 1 {
+		t.Fatalf("expected one run call, got %d", len(fakeExec.runCalls))
+	}
+	if fakeExec.runCalls[0][0] != "powershell.exe" {
+		t.Fatalf("expected powershell.exe call, got %v", fakeExec.runCalls[0])
+	}
+	joined := strings.Join(fakeExec.runCalls[0], " ")
+	if !strings.Contains(joined, "Start-Process") {
+		t.Fatalf("expected elevated Start-Process command, got %v", fakeExec.runCalls[0])
+	}
+	if !strings.Contains(joined, "--password-file") {
+		t.Fatalf("expected password-file argument in elevated command, got %v", fakeExec.runCalls[0])
 	}
 }

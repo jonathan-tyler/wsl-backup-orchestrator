@@ -100,7 +100,7 @@ func HandleWith(ctx context.Context, args []string, runner restic.Executor, deps
 				return
 			}
 
-			if err := executeProfileBackup(ctx, profileName, resticArgs, runner, deps.System); err != nil {
+			if err := executeProfileBackup(ctx, profileName, profile, resticArgs, runner, deps.System); err != nil {
 				errCh <- fmt.Errorf("profile %s: %w", profileName, err)
 			}
 		}()

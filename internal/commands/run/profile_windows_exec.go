@@ -18,7 +18,7 @@ var loadWindowsProfilePassword = func(ctx context.Context) (string, error) {
 
 var osCreateTemp = os.CreateTemp
 
-func executeWindowsProfileBackup(ctx context.Context, resticArgs []string, exec system.Executor) error {
+func executeWindowsProfileBackup(ctx context.Context, resticArgs []string, runElevated bool, exec system.Executor) error {
 	convertedArgs, err := convertRuleFileArgsToWindows(ctx, resticArgs, exec)
 	if err != nil {
 		return err
@@ -43,7 +43,24 @@ func executeWindowsProfileBackup(ctx context.Context, resticArgs []string, exec 
 	defer cleanup()
 
 	argsWithPassword := append([]string{"--password-file", passwordFile}, convertedArgs...)
+	if runElevated {
+		return runElevatedWindowsRestic(ctx, argsWithPassword, exec)
+	}
 	return exec.Run(ctx, "restic.exe", argsWithPassword...)
+}
+
+func runElevatedWindowsRestic(ctx context.Context, args []string, exec system.Executor) error {
+	command := buildElevatedResticCommand(args)
+	return exec.Run(ctx, "powershell.exe", "-NoProfile", "-Command", command)
+}
+
+func buildElevatedResticCommand(args []string) string {
+	escaped := make([]string, 0, len(args))
+	for _, item := range args {
+		escaped = append(escaped, "'"+strings.ReplaceAll(item, "'", "''")+"'")
+	}
+
+	return "$p = Start-Process -FilePath 'restic.exe' -ArgumentList @(" + strings.Join(escaped, ",") + ") -Verb RunAs -Wait -PassThru; if ($null -eq $p) { exit 1 }; exit $p.ExitCode"
 }
 
 func createWindowsPasswordFile(ctx context.Context, password string, exec system.Executor) (string, func(), error) {

@@ -66,6 +66,12 @@ func (s *fakeSystem) RunWithEnv(_ context.Context, env map[string]string, name s
 
 func (s *fakeSystem) RunCapture(_ context.Context, name string, args ...string) (string, error) {
 	key := strings.Join(append([]string{name}, args...), " ")
+	if name == "wslpath" && len(args) == 2 && args[0] == "-w" {
+		if out, ok := s.runCapture[key]; ok {
+			return out, nil
+		}
+		return "C:\\converted\\path", nil
+	}
 	if s.captureErr != nil {
 		if err, ok := s.captureErr[key]; ok {
 			return "", err
@@ -247,6 +253,28 @@ func TestHandleFailsWhenPasswordMissing(t *testing.T) {
 		t.Fatalf("expected error")
 	}
 	if !strings.Contains(err.Error(), "restic password is not configured") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestHandleFailsWhenProfilesShareNormalizedRepository(t *testing.T) {
+	t.Setenv("RESTIC_PASSWORD", "test-password")
+
+	rulesDir := withTempRules(t, "daily", []string{"wsl", "windows"}, []string{"wsl", "windows"})
+	runner := &fakeRunner{}
+	loader := fakeLoader{cfg: config.File{
+		Profiles: map[string]config.Profile{
+			"wsl":     {Repository: "/mnt/c/backups/shared"},
+			"windows": {Repository: `C:\backups\shared`},
+		},
+	}}
+	loader.cfgPathSetForTest(rulesDir)
+
+	err := HandleWith(context.Background(), []string{"daily"}, runner, RunDependencies{Loader: loader, Stat: os.Stat})
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(err.Error(), "target the same repository after normalization") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

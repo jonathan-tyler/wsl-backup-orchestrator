@@ -53,6 +53,12 @@ func (s *fakeSystem) RunWithEnv(_ context.Context, env map[string]string, name s
 
 func (s *fakeSystem) RunCapture(_ context.Context, name string, args ...string) (string, error) {
 	key := strings.Join(append([]string{name}, args...), " ")
+	if name == "wslpath" && len(args) == 2 && args[0] == "-w" {
+		if out, ok := s.runCapture[key]; ok {
+			return out, nil
+		}
+		return `C:\\converted\\path`, nil
+	}
 	if out, ok := s.runCapture[key]; ok {
 		return out, nil
 	}

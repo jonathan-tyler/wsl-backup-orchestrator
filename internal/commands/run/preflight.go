@@ -31,12 +31,38 @@ func runPreflight(
 		if err := restic.CheckPasswordConfigured(); err != nil {
 			return err
 		}
+		if err := validateRepositoryUniqueness(profiles); err != nil {
+			return err
+		}
 	}
 
 	for profileName, profile := range profiles {
 		if err := ensureRepositoryReady(ctx, profileName, profile.Repository, stat, runner, exec, confirm); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func validateRepositoryUniqueness(profiles map[string]config.Profile) error {
+	seen := map[string]string{}
+	raw := map[string]string{}
+
+	for profileName, profile := range profiles {
+		normalized := normalizePath(profile.Repository)
+		if priorProfile, exists := seen[normalized]; exists {
+			return fmt.Errorf(
+				"profiles %s and %s target the same repository after normalization: %q and %q",
+				priorProfile,
+				profileName,
+				raw[normalized],
+				profile.Repository,
+			)
+		}
+
+		seen[normalized] = profileName
+		raw[normalized] = profile.Repository
 	}
 
 	return nil
