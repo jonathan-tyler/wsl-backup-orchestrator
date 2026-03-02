@@ -315,6 +315,58 @@ func TestHandleOffersRepositoryCreation(t *testing.T) {
 	}
 }
 
+func TestHandleOffersWindowsRepositoryCreationWithPasswordFile(t *testing.T) {
+	t.Setenv("RESTIC_PASSWORD", "test-password")
+
+	rulesDir := withTempRules(t, "daily", []string{"windows"}, []string{"windows"})
+	runner := &fakeRunner{}
+	fakeExec := &fakeSystem{runCapture: map[string]string{}}
+	loader := fakeLoader{cfg: config.File{
+		ResticVersion: "0.18.1",
+		Profiles: map[string]config.Profile{
+			"windows": {Repository: `C:\\missing\\repo`, UseFSSnapshot: true},
+		},
+	}}
+	loader.cfgPathSetForTest(rulesDir)
+	fakeExec.runCapture["restic version"] = "restic 0.18.1 compiled with go"
+	fakeExec.runCapture["powershell.exe -NoProfile -Command restic version"] = "restic 0.18.1 compiled with go"
+	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.include.daily.txt")] = `C:\\rules\\windows.include.daily.txt`
+	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.exclude.daily.txt")] = `C:\\rules\\windows.exclude.daily.txt`
+
+	confirmed := false
+	err := HandleWith(context.Background(), []string{"daily"}, runner, RunDependencies{
+		Loader: loader,
+		Stat:   os.Stat,
+		System: fakeExec,
+		Confirm: func(_ string) (bool, error) {
+			confirmed = true
+			return true, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if !confirmed {
+		t.Fatalf("expected repository creation prompt")
+	}
+	if len(fakeExec.runCalls) == 0 {
+		t.Fatalf("expected windows executor calls")
+	}
+	initCall := strings.Join(fakeExec.runCalls[0], " ")
+	if !strings.Contains(initCall, "restic.exe") {
+		t.Fatalf("expected windows init via restic.exe, got %v", fakeExec.runCalls[0])
+	}
+	if !strings.Contains(initCall, "init --repo") {
+		t.Fatalf("expected init command in windows call, got %v", fakeExec.runCalls[0])
+	}
+	if !strings.Contains(initCall, `C:\\missing\\repo`) && !strings.Contains(initCall, `C:\missing\repo`) {
+		t.Fatalf("expected init call to target windows repository, got %v", fakeExec.runCalls[0])
+	}
+	if !strings.Contains(initCall, "--password-file") {
+		t.Fatalf("expected password-file on windows init call, got %v", fakeExec.runCalls[0])
+	}
+}
+
 func TestHandleFailsWhenLoaderFails(t *testing.T) {
 	err := HandleWith(context.Background(), []string{"daily"}, &fakeRunner{}, RunDependencies{Loader: fakeLoader{err: fmt.Errorf("load fail")}, Stat: os.Stat})
 	if err == nil {

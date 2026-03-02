@@ -24,6 +24,11 @@ func executeWindowsProfileBackup(ctx context.Context, resticArgs []string, runEl
 		return err
 	}
 
+	return runWindowsResticCommand(ctx, convertedArgs, runElevated, exec)
+}
+
+func runWindowsResticCommand(ctx context.Context, resticArgs []string, runElevated bool, exec system.Executor) error {
+	var err error
 	password := os.Getenv("RESTIC_PASSWORD")
 	if strings.TrimSpace(password) == "" {
 		password, err = loadWindowsProfilePassword(ctx)
@@ -42,7 +47,7 @@ func executeWindowsProfileBackup(ctx context.Context, resticArgs []string, runEl
 	}
 	defer cleanup()
 
-	argsWithPassword := append([]string{"--password-file", passwordFile}, convertedArgs...)
+	argsWithPassword := append([]string{"--password-file", passwordFile}, resticArgs...)
 	if runElevated {
 		return runElevatedWindowsRestic(ctx, argsWithPassword, exec)
 	}

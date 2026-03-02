@@ -37,7 +37,7 @@ func runPreflight(
 	}
 
 	for profileName, profile := range profiles {
-		if err := ensureRepositoryReady(ctx, profileName, profile.Repository, stat, runner, exec, confirm); err != nil {
+		if err := ensureRepositoryReady(ctx, profileName, profile, stat, runner, exec, confirm); err != nil {
 			return err
 		}
 	}
@@ -97,12 +97,13 @@ func hasProfiles(profiles map[string]config.Profile) bool {
 func ensureRepositoryReady(
 	ctx context.Context,
 	profileName string,
-	repository string,
+	profile config.Profile,
 	stat fileStatFunc,
 	runner restic.Executor,
 	exec system.Executor,
 	confirm prompt.ConfirmFunc,
 ) error {
+	repository := profile.Repository
 	if strings.TrimSpace(repository) == "" {
 		return fmt.Errorf("profile %s has empty repository", profileName)
 	}
@@ -130,7 +131,7 @@ func ensureRepositoryReady(
 	}
 
 	if strings.EqualFold(profileName, "windows") {
-		if err := exec.Run(ctx, "restic.exe", "init", "--repo", repository); err != nil {
+		if err := runWindowsResticCommand(ctx, []string{"init", "--repo", repository}, profile.RunElevated, exec); err != nil {
 			return fmt.Errorf("profile %s repository init failed: %w", profileName, err)
 		}
 		return nil
