@@ -1,0 +1,18 @@
+{
+	"folders": [
+		{
+			"name": "wsl-backup",
+			"path": "."
+		},
+		{
+			"name": "config",
+			"path": "../../../../.config/wsl-backup"
+		}
+	],
+	"settings": {
+		"chat.tools.terminal.autoApprove": {
+			"gofmt": true,
+			"go": true
+		}
+	}
+}
