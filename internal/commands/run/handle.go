@@ -3,10 +3,10 @@ package run
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/jonathan-tyler/wsl-backup-restic/internal/apperr"
 	"github.com/jonathan-tyler/wsl-backup-restic/internal/config"
@@ -27,6 +27,7 @@ type RunDependencies struct {
 	Stat    fileStatFunc
 	System  system.Executor
 	Confirm prompt.ConfirmFunc
+	Output  io.Writer
 }
 
 func Handle(ctx context.Context, args []string, runner restic.Executor) error {
@@ -35,6 +36,7 @@ func Handle(ctx context.Context, args []string, runner restic.Executor) error {
 		Stat:    os.Stat,
 		System:  system.NewOSExecutor(os.Stdout, os.Stderr),
 		Confirm: prompt.NewYesNoConfirm(os.Stdin, os.Stdout),
+		Output:  os.Stdout,
 	}
 
 	return HandleWith(ctx, args, runner, deps)
@@ -62,6 +64,9 @@ func HandleWith(ctx context.Context, args []string, runner restic.Executor, deps
 	if deps.Confirm == nil {
 		deps.Confirm = func(string) (bool, error) { return false, nil }
 	}
+	if deps.Output == nil {
+		deps.Output = os.Stdout
+	}
 
 	cfg, err := deps.Loader.Load()
 	if err != nil {
@@ -85,33 +90,17 @@ func HandleWith(ctx context.Context, args []string, runner restic.Executor, deps
 		return fmt.Errorf("no profiles configured")
 	}
 
-	var wg sync.WaitGroup
-	errCh := make(chan error, len(profileNames))
-
 	for _, profileName := range profileNames {
-		profileName := profileName
 		profile := cfg.Profiles[profileName]
+		fmt.Fprintf(deps.Output, "\n[%s]\n", profileName)
+		resticArgs, err := buildRunArgs(cfg.Dir(), profileName, profile, cadence, args[1:], deps.Stat)
+		if err != nil {
+			return err
+		}
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			resticArgs, err := buildRunArgs(cfg.Dir(), profileName, profile, cadence, args[1:], deps.Stat)
-			if err != nil {
-				errCh <- err
-				return
-			}
-
-			if err := executeProfileBackup(ctx, profileName, profile, resticArgs, runner, deps.System); err != nil {
-				errCh <- fmt.Errorf("profile %s: %w", profileName, err)
-			}
-		}()
-	}
-
-	wg.Wait()
-	close(errCh)
-
-	if len(errCh) > 0 {
-		return <-errCh
+		if err := executeProfileBackup(ctx, profileName, profile, resticArgs, runner, deps.System); err != nil {
+			return fmt.Errorf("profile %s: %w", profileName, err)
+		}
 	}
 
 	return nil

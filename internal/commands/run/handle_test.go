@@ -374,6 +374,89 @@ func TestHandleFailsWhenLoaderFails(t *testing.T) {
 	}
 }
 
+func TestHandleStopsAfterFirstProfileError(t *testing.T) {
+	t.Setenv("RESTIC_PASSWORD", "test-password")
+
+	rulesDir := withTempRules(t, "daily", []string{"wsl", "windows"}, []string{"wsl", "windows"})
+	wslRepo := withTempRepository(t)
+	runner := &fakeRunner{}
+	fakeExec := &fakeSystem{
+		runCapture: map[string]string{},
+		runErr: map[string]error{
+			"restic.exe --password-file C:\\rules\\restic-password.txt --repo C:\\repo\\windows backup --tag cadence=daily --tag profile=windows --files-from C:\\rules\\windows.include.daily.txt --exclude-file C:\\rules\\windows.exclude.daily.txt": fmt.Errorf("windows failed"),
+		},
+	}
+	loader := fakeLoader{cfg: config.File{
+		ResticVersion: "0.18.1",
+		Profiles: map[string]config.Profile{
+			"windows": {Repository: `C:\repo\windows`, UseFSSnapshot: false},
+			"wsl":     {Repository: wslRepo, UseFSSnapshot: false},
+		},
+	}}
+	loader.cfgPathSetForTest(rulesDir)
+	fakeExec.runCapture["restic version"] = "restic 0.18.1 compiled with go"
+	fakeExec.runCapture["pwsh.exe -NoProfile -Command restic version"] = "restic 0.18.1 compiled with go"
+	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.include.daily.txt")] = `C:\rules\windows.include.daily.txt`
+	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.exclude.daily.txt")] = `C:\rules\windows.exclude.daily.txt`
+
+	originalCreateTemp := osCreateTemp
+	osCreateTemp = func(_ string, _ string) (*os.File, error) {
+		path := filepath.Join(os.TempDir(), "wsl-backup-restic-password-001.txt")
+		file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
+		if err != nil {
+			return nil, err
+		}
+		return file, nil
+	}
+	t.Cleanup(func() {
+		osCreateTemp = originalCreateTemp
+		_ = os.Remove(filepath.Join(os.TempDir(), "wsl-backup-restic-password-001.txt"))
+	})
+	fakeExec.runCapture["wslpath -w "+filepath.Join(os.TempDir(), "wsl-backup-restic-password-001.txt")] = `C:\rules\restic-password.txt`
+
+	err := HandleWith(context.Background(), []string{"daily"}, runner, RunDependencies{Loader: loader, Stat: os.Stat, System: fakeExec})
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(err.Error(), "profile windows") {
+		t.Fatalf("expected windows profile error, got %v", err)
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("expected wsl profile not to run after windows error, got %d calls", len(runner.calls))
+	}
+}
+
+func TestHandlePrintsProfilePrefix(t *testing.T) {
+	t.Setenv("RESTIC_PASSWORD", "test-password")
+
+	rulesDir := withTempRules(t, "weekly", []string{"wsl"}, []string{"wsl"})
+	wslRepo := withTempRepository(t)
+	runner := &fakeRunner{}
+	fakeExec := &fakeSystem{runCapture: map[string]string{}}
+	loader := fakeLoader{cfg: config.File{
+		ResticVersion: "0.18.1",
+		Profiles: map[string]config.Profile{
+			"wsl": {Repository: wslRepo},
+		},
+	}}
+	loader.cfgPathSetForTest(rulesDir)
+	fakeExec.runCapture["restic version"] = "restic 0.18.1 compiled with go"
+
+	var output strings.Builder
+	err := HandleWith(context.Background(), []string{"weekly"}, runner, RunDependencies{
+		Loader: loader,
+		Stat:   os.Stat,
+		System: fakeExec,
+		Output: &output,
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if !strings.Contains(output.String(), "[wsl]") {
+		t.Fatalf("expected profile prefix in output, got %q", output.String())
+	}
+}
+
 func (l *fakeLoader) cfgPathSetForTest(dir string) {
 	l.cfg = config.FileWithPathForTest(l.cfg, filepath.Join(dir, "config.yaml"))
 }
