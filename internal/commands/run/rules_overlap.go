@@ -2,7 +2,6 @@ package run
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -13,15 +12,7 @@ import (
 type readFileFunc func(string) ([]byte, error)
 
 func validateIncludeRuleOverlap(configDir string, cadence string, profiles map[string]config.Profile, readFile readFileFunc) error {
-	if err := validateRuleKindOverlap(configDir, cadence, profiles, readFile, "include"); err != nil {
-		return err
-	}
-
-	if err := validateRuleKindOverlap(configDir, cadence, profiles, readFile, "exclude"); err != nil {
-		return err
-	}
-
-	return nil
+	return validateRuleKindOverlap(configDir, cadence, profiles, readFile, "include")
 }
 
 func validateRuleKindOverlap(configDir string, cadence string, profiles map[string]config.Profile, readFile readFileFunc, kind string) error {
@@ -30,9 +21,6 @@ func validateRuleKindOverlap(configDir string, cadence string, profiles map[stri
 		rulesPath := rulesFilePath(configDir, profileName, cadence, kind)
 		content, err := readFile(rulesPath)
 		if err != nil {
-			if kind == "exclude" && os.IsNotExist(err) {
-				continue
-			}
 			return fmt.Errorf("profile %s read %s rules failed: %w", profileName, kind, err)
 		}
 

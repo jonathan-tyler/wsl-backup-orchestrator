@@ -264,7 +264,7 @@ func TestValidateIncludeRuleOverlapAllowsDistinctPaths(t *testing.T) {
 	}
 }
 
-func TestValidateIncludeRuleOverlapFailsOnExcludeOverlap(t *testing.T) {
+func TestValidateIncludeRuleOverlapAllowsExcludeOverlap(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "wsl.include.daily.txt"), []byte("/data/wsl\n"), 0o644); err != nil {
 		t.Fatalf("write include rules: %v", err)
@@ -283,11 +283,8 @@ func TestValidateIncludeRuleOverlapFailsOnExcludeOverlap(t *testing.T) {
 		"wsl":     {Repository: "/repo/wsl"},
 		"windows": {Repository: `C:\repo`},
 	}, os.ReadFile)
-	if err == nil {
-		t.Fatalf("expected overlap error")
-	}
-	if !strings.Contains(err.Error(), "exclude") {
-		t.Fatalf("unexpected error: %v", err)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
 	}
 }
 
