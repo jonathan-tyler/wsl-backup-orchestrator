@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/commands/run"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/config"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/commands/run"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/config"
 )
 
 type fakeRunner struct {

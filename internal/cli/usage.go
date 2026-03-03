@@ -7,9 +7,9 @@ import (
 
 func printUsage(out io.Writer) {
 	fmt.Fprint(out, `Usage:
-  backup run <daily|weekly|monthly> [restic-args...]
-  backup setup
-  backup restore <target> [--dry-run] [restic-args...]
+  wsl-backup run <daily|weekly|monthly> [restic-args...]
+  wsl-backup setup
+  wsl-backup restore <target> [--dry-run] [restic-args...]
 
 Commands:
   run      Run all configured profiles for a cadence (fast preflight only)
@@ -19,7 +19,8 @@ Commands:
 Environment:
   BACKUP_CONFIG                  Optional config file path override
   RESTIC_PASSWORD                Restic password value (manual or scheduled use)
-  WSL_BACKUP_RESTIC_PASSWORD_FILE  Preferred password file path for wsl-backup
+  WSL_BACKUP_PASSWORD_FILE       Preferred password file path
+  WSL_BACKUP_RESTIC_PASSWORD_FILE  Legacy alias for preferred password file path
   RESTIC_PASSWORD_FILE           Restic-compatible password file path
   CREDENTIALS_DIRECTORY          systemd credentials directory (uses credential name restic_password)
 `)

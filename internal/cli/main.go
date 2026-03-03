@@ -7,12 +7,12 @@ import (
 	"io"
 	"os"
 
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/apperr"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/commands/restore"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/commands/run"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/commands/setup"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/platform"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/restic"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/apperr"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/commands/restore"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/commands/run"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/commands/setup"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/platform"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/restic"
 )
 
 func Main(args []string, stdout io.Writer, stderr io.Writer) int {
@@ -98,7 +98,7 @@ func (r Router) Route(ctx context.Context, args []string) int {
 }
 
 func normalizeArgs(args []string) []string {
-	if len(args) > 0 && args[0] == "backup" {
+	if len(args) > 0 && args[0] == "wsl-backup" {
 		return args[1:]
 	}
 	return args

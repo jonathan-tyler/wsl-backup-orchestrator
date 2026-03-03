@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/config"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/prompt"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/restic"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/system"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/config"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/prompt"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/restic"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/system"
 )
 
 func runPreflight(

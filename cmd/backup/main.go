@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/cli"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/cli"
 )
 
 var (

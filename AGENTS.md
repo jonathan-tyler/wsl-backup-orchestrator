@@ -7,7 +7,9 @@
 ## Rules
 
 - Do not suggest adding new content to `AGENTS.md`, but you may add specific content when asked to.
-- If a project name is needed for paths, executable names, or config paths, use `wsl-backup`.
-- After significant changes, or before handing work back to the user, rebuild the binary artifact with `go build -o out/wsl-backup ./cmd/backup`.
+- Use `wsl-backup` for user-facing command/config naming (for example CLI command text and config directory paths).
+- Use `wsl-backup-orchestrator` for repository/module/artifact naming (for example module path and built binary output name).
+- After significant changes, or before handing work back to the user, rebuild the binary artifact with `go build -o out/wsl-backup-orchestrator ./cmd/backup`.
+- Suggest backward-compatibility approaches when relevant, but do not implement backward-compatibility behavior unless explicitly requested.
 - After completing the next set of code changes, run a build before finalizing your response.
 - Do not offer to run `build module` unless operating within the dev container.

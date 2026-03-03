@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/apperr"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/restic"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/apperr"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/restic"
 )
 
 type fakeRunner struct {
@@ -65,7 +65,7 @@ func TestRouteUnknownCommand(t *testing.T) {
 	}
 }
 
-func TestRouteAcceptsLeadingBackupToken(t *testing.T) {
+func TestRouteAcceptsLeadingWSLBackupToken(t *testing.T) {
 	var stdout strings.Builder
 	var stderr strings.Builder
 	runner := &fakeRunner{}
@@ -73,7 +73,7 @@ func TestRouteAcceptsLeadingBackupToken(t *testing.T) {
 		return execRunner.Run(ctx, "backup", "--tag", "cadence=daily")
 	}}
 
-	code := r.Route(context.Background(), []string{"backup", "run", "daily"})
+	code := r.Route(context.Background(), []string{"wsl-backup", "run", "daily"})
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d", code)
 	}

@@ -1,4 +1,4 @@
-module github.com/jonathan-tyler/wsl-backup-restic
+module github.com/jonathan-tyler/wsl-backup-orchestrator
 
 go 1.23.0
 

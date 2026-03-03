@@ -3,8 +3,8 @@ package restore
 import (
 	"context"
 
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/apperr"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/restic"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/apperr"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/restic"
 )
 
 func Handle(ctx context.Context, args []string, runner restic.Executor) error {

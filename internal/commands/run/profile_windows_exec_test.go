@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/system"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/system"
 )
 
 func TestExecuteWindowsProfileBackupRunsResticExe(t *testing.T) {
@@ -24,12 +24,12 @@ func TestExecuteWindowsProfileBackupRunsResticExe(t *testing.T) {
 
 	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.include.daily.txt")] = "C:\\rules\\windows.include.daily.txt"
 	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.exclude.txt")] = "C:\\rules\\windows.exclude.txt"
-	fakeExec.runCapture["wslpath -w "+filepath.Join(os.TempDir(), "wsl-backup-restic-password-000.txt")] = "C:\\Temp\\wsl-backup-restic-password-000.txt"
+	fakeExec.runCapture["wslpath -w "+filepath.Join(os.TempDir(), "wsl-backup-orchestrator-password-000.txt")] = "C:\\Temp\\wsl-backup-orchestrator-password-000.txt"
 	args := []string{"--repo", `C:\repo`, "backup", "--files-from", filepath.Join(rulesDir, "windows.include.daily.txt")}
 
 	originalCreateTemp := osCreateTemp
 	osCreateTemp = func(_ string, _ string) (*os.File, error) {
-		path := filepath.Join(os.TempDir(), "wsl-backup-restic-password-000.txt")
+		path := filepath.Join(os.TempDir(), "wsl-backup-orchestrator-password-000.txt")
 		file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 		if err != nil {
 			return nil, err
@@ -38,7 +38,6 @@ func TestExecuteWindowsProfileBackupRunsResticExe(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		osCreateTemp = originalCreateTemp
-		_ = os.Remove(filepath.Join(os.TempDir(), "wsl-backup-restic-password-000.txt"))
 	})
 
 	err := executeWindowsProfileBackup(context.Background(), args, false, fakeExec)
@@ -53,7 +52,7 @@ func TestExecuteWindowsProfileBackupRunsResticExe(t *testing.T) {
 	if !strings.Contains(joined, "restic.exe") {
 		t.Fatalf("expected restic.exe call, got %v", fakeExec.runCalls[0])
 	}
-	if !strings.Contains(joined, `--password-file C:\Temp\wsl-backup-restic-password-000.txt`) {
+	if !strings.Contains(joined, `--password-file C:\Temp\wsl-backup-orchestrator-password-000.txt`) {
 		t.Fatalf("expected windows password file arg, got %v", fakeExec.runCalls[0])
 	}
 	if !strings.Contains(joined, `C:\rules\windows.include.daily.txt`) {
@@ -64,6 +63,11 @@ func TestExecuteWindowsProfileBackupRunsResticExe(t *testing.T) {
 	}
 	if len(fakeExec.runWithEnv[0]) != 0 {
 		t.Fatalf("expected no env overrides, got %v", fakeExec.runWithEnv[0])
+	}
+
+	passwordPath := filepath.Join(os.TempDir(), "wsl-backup-orchestrator-password-000.txt")
+	if _, statErr := os.Stat(passwordPath); !os.IsNotExist(statErr) {
+		t.Fatalf("expected temporary password file cleanup, stat err=%v", statErr)
 	}
 }
 
@@ -137,12 +141,12 @@ func TestExecuteWindowsProfileBackupRunsElevatedViaPowerShell(t *testing.T) {
 
 	originalCreateTemp := osCreateTemp
 	osCreateTemp = func(_ string, pattern string) (*os.File, error) {
-		path := filepath.Join(elevatedWindowsTempDir, "wsl-backup-restic-password-111.txt")
+		path := filepath.Join(elevatedWindowsTempDir, "wsl-backup-orchestrator-password-111.txt")
 		if strings.Contains(pattern, "rule") {
-			path = filepath.Join(elevatedWindowsTempDir, "wsl-backup-rule-111.txt")
+			path = filepath.Join(elevatedWindowsTempDir, "wsl-backup-orchestrator-rule-111.txt")
 		}
 		if strings.Contains(pattern, "exitcode") {
-			path = filepath.Join(elevatedWindowsTempDir, "wsl-backup-restic-exitcode-111.txt")
+			path = filepath.Join(elevatedWindowsTempDir, "wsl-backup-orchestrator-exitcode-111.txt")
 		}
 		file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 		if err != nil {
@@ -162,9 +166,6 @@ func TestExecuteWindowsProfileBackupRunsElevatedViaPowerShell(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		osCreateTemp = originalCreateTemp
-		_ = os.Remove(filepath.Join(elevatedWindowsTempDir, "wsl-backup-restic-password-111.txt"))
-		_ = os.Remove(filepath.Join(elevatedWindowsTempDir, "wsl-backup-rule-111.txt"))
-		_ = os.Remove(filepath.Join(elevatedWindowsTempDir, "wsl-backup-restic-exitcode-111.txt"))
 	})
 
 	err := executeWindowsProfileBackup(context.Background(), args, true, fakeExec)
@@ -187,5 +188,10 @@ func TestExecuteWindowsProfileBackupRunsElevatedViaPowerShell(t *testing.T) {
 	}
 	if !strings.Contains(joined, `C:\\Users\\daily\\scoop\\shims\\restic.exe`) && !strings.Contains(joined, `C:\Users\daily\scoop\shims\restic.exe`) {
 		t.Fatalf("expected resolved restic.exe full path in elevated command, got %v", fakeExec.runCalls[0])
+	}
+
+	passwordPath := filepath.Join(elevatedWindowsTempDir, "wsl-backup-orchestrator-password-111.txt")
+	if _, statErr := os.Stat(passwordPath); !os.IsNotExist(statErr) {
+		t.Fatalf("expected elevated temporary password file cleanup, stat err=%v", statErr)
 	}
 }

@@ -76,8 +76,8 @@ func TestOSExecutorRunWithEnvEchoesCommand(t *testing.T) {
 }
 
 func TestFormatCommandQuotesWhitespaceArgs(t *testing.T) {
-	formatted := formatCommand([]string{"backup", "--target", "/tmp/my folder"})
-	if formatted != "backup --target \"/tmp/my folder\"" {
+	formatted := formatCommand([]string{"wsl-backup", "--target", "/tmp/my folder"})
+	if formatted != "wsl-backup --target \"/tmp/my folder\"" {
 		t.Fatalf("unexpected formatted command: %q", formatted)
 	}
 }

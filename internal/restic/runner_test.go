@@ -35,6 +35,7 @@ func TestOSRunnerFailsWithoutPasswordSource(t *testing.T) {
 	t.Cleanup(func() { commandContext = original })
 
 	t.Setenv("RESTIC_PASSWORD", "")
+	t.Setenv(BackupPasswordFileEnv, "")
 	t.Setenv(WSLBackupPasswordFileEnv, "")
 	t.Setenv(ResticPasswordFileEnv, "")
 	t.Setenv(SystemdCredentialsDirEnv, "")

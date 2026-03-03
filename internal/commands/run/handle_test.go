@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/apperr"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/config"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/apperr"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/config"
 )
 
 type fakeRunner struct {
@@ -390,7 +390,7 @@ func TestHandleStopsAfterFirstProfileError(t *testing.T) {
 	fakeExec := &fakeSystem{
 		runCapture: map[string]string{},
 		runErr: map[string]error{
-			"restic.exe --password-file C:\\rules\\restic-password.txt --repo C:\\repo\\windows backup --tag cadence=daily --tag profile=windows --files-from C:\\rules\\windows.include.daily.txt --exclude-file C:\\rules\\windows.exclude.txt": fmt.Errorf("windows failed"),
+			"restic.exe --password-file C:\\rules\\backup-password.txt --repo C:\\repo\\windows backup --tag cadence=daily --tag profile=windows --files-from C:\\rules\\windows.include.daily.txt --exclude-file C:\\rules\\windows.exclude.txt": fmt.Errorf("windows failed"),
 		},
 	}
 	loader := fakeLoader{cfg: config.File{
@@ -408,7 +408,7 @@ func TestHandleStopsAfterFirstProfileError(t *testing.T) {
 
 	originalCreateTemp := osCreateTemp
 	osCreateTemp = func(_ string, _ string) (*os.File, error) {
-		path := filepath.Join(os.TempDir(), "wsl-backup-restic-password-001.txt")
+		path := filepath.Join(os.TempDir(), "wsl-backup-orchestrator-password-001.txt")
 		file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 		if err != nil {
 			return nil, err
@@ -417,9 +417,9 @@ func TestHandleStopsAfterFirstProfileError(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		osCreateTemp = originalCreateTemp
-		_ = os.Remove(filepath.Join(os.TempDir(), "wsl-backup-restic-password-001.txt"))
+		_ = os.Remove(filepath.Join(os.TempDir(), "wsl-backup-orchestrator-password-001.txt"))
 	})
-	fakeExec.runCapture["wslpath -w "+filepath.Join(os.TempDir(), "wsl-backup-restic-password-001.txt")] = `C:\rules\restic-password.txt`
+	fakeExec.runCapture["wslpath -w "+filepath.Join(os.TempDir(), "wsl-backup-orchestrator-password-001.txt")] = `C:\rules\backup-password.txt`
 
 	err := HandleWith(context.Background(), []string{"daily"}, runner, RunDependencies{Loader: loader, Stat: os.Stat, System: fakeExec})
 	if err == nil {

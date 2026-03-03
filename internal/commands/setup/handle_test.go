@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/apperr"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/config"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/resticversion"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/apperr"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/config"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/resticversion"
 )
 
 type fakeLoader struct {
@@ -115,13 +115,13 @@ func TestHandlePrintsSuccessSummary(t *testing.T) {
 	}
 
 	text := output.String()
-	if !strings.Contains(text, "Running backup setup checks and installers") {
+	if !strings.Contains(text, "Running wsl-backup setup checks and installers") {
 		t.Fatalf("expected startup message, got %q", text)
 	}
 	if !strings.Contains(text, "setup report:") {
 		t.Fatalf("expected setup report, got %q", text)
 	}
-	if !strings.Contains(text, "Backup setup completed successfully") {
+	if !strings.Contains(text, "wsl-backup setup completed successfully") {
 		t.Fatalf("expected success summary, got %q", text)
 	}
 }
@@ -159,7 +159,7 @@ func TestHandlePrintsFailureSummary(t *testing.T) {
 	if !strings.Contains(err.Error(), "sync failed") {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(output.String(), "Backup setup failed: sync failed") {
+	if !strings.Contains(output.String(), "wsl-backup setup failed: sync failed") {
 		t.Fatalf("expected failure summary, got %q", output.String())
 	}
 }

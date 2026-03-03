@@ -17,7 +17,7 @@ func TestMainForwardsArgsAndExitsWithCode(t *testing.T) {
 		exitFunc = originalExit
 	})
 
-	os.Args = []string{"backup", "run", "daily"}
+	os.Args = []string{"wsl-backup", "run", "daily"}
 
 	var gotArgs []string
 	var gotCode int

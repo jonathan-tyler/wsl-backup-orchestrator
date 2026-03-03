@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/prompt"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/system"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/prompt"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/system"
 )
 
 func checkWSLCompatible(ctx context.Context, desiredVersion string, exec system.Executor) error {
 	output, err := exec.RunCapture(ctx, "restic", "version")
 	if err != nil {
-		return fmt.Errorf("wsl restic is missing; run backup setup")
+		return fmt.Errorf("wsl restic is missing; run wsl-backup setup")
 	}
 
 	installedVersion, parseErr := parseResticVersion(output)
@@ -20,7 +20,7 @@ func checkWSLCompatible(ctx context.Context, desiredVersion string, exec system.
 	}
 
 	if installedVersion != desiredVersion {
-		return fmt.Errorf("wsl restic version mismatch: installed=%s required=%s; run backup setup", installedVersion, desiredVersion)
+		return fmt.Errorf("wsl restic version mismatch: installed=%s required=%s; run wsl-backup setup", installedVersion, desiredVersion)
 	}
 
 	return nil

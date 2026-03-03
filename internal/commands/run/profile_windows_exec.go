@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/restic"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/system"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/restic"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/system"
 )
 
 var loadWindowsProfilePassword = func(ctx context.Context) (string, error) {
@@ -136,7 +136,7 @@ func buildElevatedResticCommand(resticExePath string, args []string, exitCodeFil
 }
 
 func createWindowsExitCodeFile() (string, string, func(), error) {
-	file, err := osCreateTemp(elevatedWindowsTempDir, "wsl-backup-restic-exitcode-*.txt")
+	file, err := osCreateTemp(elevatedWindowsTempDir, "wsl-backup-orchestrator-exitcode-*.txt")
 	if err != nil {
 		return "", "", func() {}, fmt.Errorf("create elevated exit-code file: %w", err)
 	}
@@ -161,7 +161,7 @@ func createWindowsExitCodeFile() (string, string, func(), error) {
 }
 
 func createElevatedWindowsPasswordFile(password string) (string, func(), error) {
-	file, err := osCreateTemp(elevatedWindowsTempDir, "wsl-backup-restic-password-*.txt")
+	file, err := osCreateTemp(elevatedWindowsTempDir, "wsl-backup-orchestrator-password-*.txt")
 	if err != nil {
 		return "", func() {}, fmt.Errorf("create elevated temporary password file: %w", err)
 	}
@@ -219,7 +219,7 @@ func stageElevatedRuleFiles(args []string) ([]string, func(), error) {
 		}
 
 		ext := filepath.Ext(sourcePath)
-		file, err := osCreateTemp(elevatedWindowsTempDir, "wsl-backup-rule-*"+ext)
+		file, err := osCreateTemp(elevatedWindowsTempDir, "wsl-backup-orchestrator-rule-*"+ext)
 		if err != nil {
 			cleanup()
 			return nil, func() {}, fmt.Errorf("create elevated windows rule file: %w", err)
@@ -303,7 +303,7 @@ func wslPathToWindowsPath(path string) (string, bool) {
 }
 
 func createWindowsPasswordFile(ctx context.Context, password string, exec system.Executor) (string, func(), error) {
-	file, err := osCreateTemp("", "wsl-backup-restic-password-*.txt")
+	file, err := osCreateTemp("", "wsl-backup-orchestrator-password-*.txt")
 	if err != nil {
 		return "", func() {}, fmt.Errorf("create temporary password file: %w", err)
 	}

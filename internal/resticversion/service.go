@@ -6,9 +6,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/config"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/prompt"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/system"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/config"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/prompt"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/system"
 )
 
 type SetupStatus string

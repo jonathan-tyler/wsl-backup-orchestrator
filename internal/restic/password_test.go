@@ -15,6 +15,7 @@ func TestLoadResticPasswordFromPreferredFileEnv(t *testing.T) {
 		t.Fatalf("write password file: %v", err)
 	}
 	t.Setenv(WSLBackupPasswordFileEnv, passwordPath)
+	t.Setenv(BackupPasswordFileEnv, "")
 	t.Setenv(ResticPasswordFileEnv, "")
 	t.Setenv(SystemdCredentialsDirEnv, "")
 
@@ -29,6 +30,7 @@ func TestLoadResticPasswordFromPreferredFileEnv(t *testing.T) {
 
 func TestLoadResticPasswordFromSystemdCredential(t *testing.T) {
 	t.Setenv("RESTIC_PASSWORD", "")
+	t.Setenv(BackupPasswordFileEnv, "")
 	t.Setenv(WSLBackupPasswordFileEnv, "")
 	t.Setenv(ResticPasswordFileEnv, "")
 
@@ -44,6 +46,28 @@ func TestLoadResticPasswordFromSystemdCredential(t *testing.T) {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 	if password != "from-cred" {
+		t.Fatalf("unexpected password value: %q", password)
+	}
+}
+
+func TestLoadResticPasswordFromGenericBackupPasswordFileEnv(t *testing.T) {
+	t.Setenv("RESTIC_PASSWORD", "")
+
+	dir := t.TempDir()
+	passwordPath := filepath.Join(dir, "pass.txt")
+	if err := os.WriteFile(passwordPath, []byte("generic-source\n"), 0o600); err != nil {
+		t.Fatalf("write password file: %v", err)
+	}
+	t.Setenv(BackupPasswordFileEnv, passwordPath)
+	t.Setenv(WSLBackupPasswordFileEnv, "")
+	t.Setenv(ResticPasswordFileEnv, "")
+	t.Setenv(SystemdCredentialsDirEnv, "")
+
+	password, err := loadResticPassword()
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if password != "generic-source" {
 		t.Fatalf("unexpected password value: %q", password)
 	}
 }

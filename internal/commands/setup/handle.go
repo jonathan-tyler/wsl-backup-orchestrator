@@ -6,12 +6,12 @@ import (
 	"io"
 	"os"
 
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/apperr"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/config"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/prompt"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/restic"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/resticversion"
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/system"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/apperr"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/config"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/prompt"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/restic"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/resticversion"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/system"
 )
 
 type ConfigLoader interface {
@@ -46,7 +46,7 @@ func Handle(ctx context.Context, args []string, _ restic.Executor) error {
 		return apperr.UsageError{Message: "setup does not take positional arguments"}
 	}
 
-	fmt.Fprintln(setupStdout, "Running backup setup checks and installers...")
+	fmt.Fprintln(setupStdout, "Running wsl-backup setup checks and installers...")
 
 	deps := Dependencies{
 		Loader:  newConfigLoader(),
@@ -57,9 +57,9 @@ func Handle(ctx context.Context, args []string, _ restic.Executor) error {
 	report, err := handleWithReportFunc(ctx, deps)
 	printSetupReport(report)
 	if err == nil {
-		fmt.Fprintln(setupStdout, "Backup setup completed successfully.")
+		fmt.Fprintln(setupStdout, "wsl-backup setup completed successfully.")
 	} else {
-		fmt.Fprintf(setupStdout, "Backup setup failed: %v\n", err)
+		fmt.Fprintf(setupStdout, "wsl-backup setup failed: %v\n", err)
 	}
 	return err
 }

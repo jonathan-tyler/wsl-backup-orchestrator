@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/config"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/config"
 )
 
 func TestCheckCompatibleFailsWithSetupHintOnWindowsMismatch(t *testing.T) {
@@ -24,7 +24,7 @@ func TestCheckCompatibleFailsWithSetupHintOnWindowsMismatch(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error")
 	}
-	if !strings.Contains(err.Error(), "run backup setup") {
+	if !strings.Contains(err.Error(), "run wsl-backup setup") {
 		t.Fatalf("expected setup hint, got %v", err)
 	}
 }

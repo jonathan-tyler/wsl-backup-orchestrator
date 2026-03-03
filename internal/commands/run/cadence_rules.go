@@ -3,7 +3,7 @@ package run
 import (
 	"fmt"
 
-	"github.com/jonathan-tyler/wsl-backup-restic/internal/config"
+	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/config"
 )
 
 func inheritedCadences(cadence string) ([]string, error) {
