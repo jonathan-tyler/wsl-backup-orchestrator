@@ -72,7 +72,7 @@ func writeRules(t *testing.T, dir string, profile string, cadence string) {
 		t.Fatalf("write include: %v", err)
 	}
 
-	excludePath := filepath.Join(dir, fmt.Sprintf("%s.exclude.%s.txt", profile, cadence))
+	excludePath := filepath.Join(dir, fmt.Sprintf("%s.exclude.txt", profile))
 	if err := os.WriteFile(excludePath, []byte("/tmp/exclude-"+profile+"\n"), 0o644); err != nil {
 		t.Fatalf("write exclude: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestRunAssemblesProfileCommandsForWSLAndWindows(t *testing.T) {
 	exec.runCapture["restic version"] = "restic 0.18.1 compiled with go"
 	exec.runCapture["pwsh.exe -NoProfile -Command restic version"] = "restic 0.18.1 compiled with go"
 	exec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.include.daily.txt")] = `C:\rules\windows.include.daily.txt`
-	exec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.exclude.daily.txt")] = `C:\rules\windows.exclude.daily.txt`
+	exec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.exclude.txt")] = `C:\rules\windows.exclude.txt`
 
 	loader := fakeLoader{cfg: config.FileWithPathForTest(config.File{
 		ResticVersion: "0.18.1",

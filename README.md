@@ -14,7 +14,9 @@ Thin, predictable wrapper around `restic`, run from WSL and usable as a `wsl-sys
 - Optional config override: `BACKUP_CONFIG=/path/to/config.yaml`
 - Starter config: [config.example.yaml](config.example.yaml)
 - Rule file directory: `~/.config/wsl-backup/`
-- Rule naming: `<profile>.<include|exclude>.<daily|weekly|monthly>.txt`
+- Rule naming:
+  - Include: `<profile>.include.<daily|weekly|monthly>.txt`
+  - Exclude: `<profile>.exclude.txt`
   - Cadence inheritance is cumulative:
     - `daily` uses `*.daily.txt`
     - `weekly` uses `*.daily.txt` + `*.weekly.txt`
@@ -71,7 +73,7 @@ backup run daily
 
 - Missing rules behavior:
   - Missing include rule files fail fast for all inherited cadences.
-  - Missing exclude rule files fail fast for all inherited cadences.
+  - Missing exclude rule file (`<profile>.exclude.txt`) fails fast.
   - Overlap across profiles in include rules fails fast.
 
 - `backup restore <target> --dry-run` passes `--dry-run` to `restic restore` and performs a non-writing preview restore.

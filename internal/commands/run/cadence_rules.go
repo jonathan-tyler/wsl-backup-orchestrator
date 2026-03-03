@@ -34,15 +34,9 @@ func includeRulePaths(configDir string, profileName string, cadence string) ([]s
 }
 
 func excludeRulePaths(configDir string, profileName string, cadence string) ([]string, error) {
-	items, err := inheritedCadences(cadence)
-	if err != nil {
+	if _, err := inheritedCadences(cadence); err != nil {
 		return nil, err
 	}
 
-	paths := make([]string, 0, len(items))
-	for _, item := range items {
-		paths = append(paths, config.ExcludeRulesPath(configDir, profileName, item))
-	}
-
-	return paths, nil
+	return []string{config.ExcludeRulesPath(configDir, profileName)}, nil
 }

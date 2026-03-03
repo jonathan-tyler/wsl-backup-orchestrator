@@ -108,12 +108,12 @@ func withTempRules(t *testing.T, cadence string, includeProfiles []string, exclu
 				t.Fatalf("write include rules: %v", err)
 			}
 		}
+	}
 
-		for _, profile := range excludeProfiles {
-			path := filepath.Join(dir, fmt.Sprintf("%s.exclude.%s.txt", profile, item))
-			if err := os.WriteFile(path, []byte("*.tmp\n"), 0o644); err != nil {
-				t.Fatalf("write exclude rules: %v", err)
-			}
+	for _, profile := range excludeProfiles {
+		path := filepath.Join(dir, fmt.Sprintf("%s.exclude.txt", profile))
+		if err := os.WriteFile(path, []byte("*.tmp\n"), 0o644); err != nil {
+			t.Fatalf("write exclude rules: %v", err)
 		}
 	}
 
@@ -172,7 +172,7 @@ func TestHandleRunsConfiguredProfiles(t *testing.T) {
 	fakeExec.runCapture["restic version"] = "restic 0.18.1 compiled with go"
 	fakeExec.runCapture["pwsh.exe -NoProfile -Command restic version"] = "restic 0.18.1 compiled with go"
 	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.include.weekly.txt")] = "C:\\rules\\windows.include.weekly.txt"
-	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.exclude.weekly.txt")] = "C:\\rules\\windows.exclude.weekly.txt"
+	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.exclude.txt")] = "C:\\rules\\windows.exclude.txt"
 
 	err := HandleWith(context.Background(), []string{"weekly", "--one-file-system"}, runner, RunDependencies{Loader: loader, Stat: os.Stat, System: fakeExec})
 	if err != nil {
@@ -215,7 +215,7 @@ func TestHandleRunsConfiguredProfiles(t *testing.T) {
 	if !strings.Contains(windowsCall, `C:\rules\windows.include.weekly.txt`) {
 		t.Fatalf("expected converted include path in windows call, got %v", fakeExec.runCalls[0])
 	}
-	if !strings.Contains(windowsCall, `C:\rules\windows.exclude.weekly.txt`) {
+	if !strings.Contains(windowsCall, `C:\rules\windows.exclude.txt`) {
 		t.Fatalf("expected converted exclude path in windows call, got %v", fakeExec.runCalls[0])
 	}
 
@@ -335,7 +335,7 @@ func TestHandleOffersWindowsRepositoryCreationWithPasswordFile(t *testing.T) {
 	fakeExec.runCapture["restic version"] = "restic 0.18.1 compiled with go"
 	fakeExec.runCapture["pwsh.exe -NoProfile -Command restic version"] = "restic 0.18.1 compiled with go"
 	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.include.daily.txt")] = `C:\\rules\\windows.include.daily.txt`
-	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.exclude.daily.txt")] = `C:\\rules\\windows.exclude.daily.txt`
+	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.exclude.txt")] = `C:\\rules\\windows.exclude.txt`
 
 	confirmed := false
 	err := HandleWith(context.Background(), []string{"daily"}, runner, RunDependencies{
@@ -390,7 +390,7 @@ func TestHandleStopsAfterFirstProfileError(t *testing.T) {
 	fakeExec := &fakeSystem{
 		runCapture: map[string]string{},
 		runErr: map[string]error{
-			"restic.exe --password-file C:\\rules\\restic-password.txt --repo C:\\repo\\windows backup --tag cadence=daily --tag profile=windows --files-from C:\\rules\\windows.include.daily.txt --exclude-file C:\\rules\\windows.exclude.daily.txt": fmt.Errorf("windows failed"),
+			"restic.exe --password-file C:\\rules\\restic-password.txt --repo C:\\repo\\windows backup --tag cadence=daily --tag profile=windows --files-from C:\\rules\\windows.include.daily.txt --exclude-file C:\\rules\\windows.exclude.txt": fmt.Errorf("windows failed"),
 		},
 	}
 	loader := fakeLoader{cfg: config.File{
@@ -404,7 +404,7 @@ func TestHandleStopsAfterFirstProfileError(t *testing.T) {
 	fakeExec.runCapture["restic version"] = "restic 0.18.1 compiled with go"
 	fakeExec.runCapture["pwsh.exe -NoProfile -Command restic version"] = "restic 0.18.1 compiled with go"
 	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.include.daily.txt")] = `C:\rules\windows.include.daily.txt`
-	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.exclude.daily.txt")] = `C:\rules\windows.exclude.daily.txt`
+	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.exclude.txt")] = `C:\rules\windows.exclude.txt`
 
 	originalCreateTemp := osCreateTemp
 	osCreateTemp = func(_ string, _ string) (*os.File, error) {
@@ -498,11 +498,8 @@ func TestBuildRunArgsWeeklyIncludesDailyAndWeeklyRuleFiles(t *testing.T) {
 	if !strings.Contains(joined, "--files-from "+filepath.Join(rulesDir, "wsl.include.weekly.txt")) {
 		t.Fatalf("expected weekly include rules in args: %v", args)
 	}
-	if !strings.Contains(joined, "--exclude-file "+filepath.Join(rulesDir, "wsl.exclude.daily.txt")) {
-		t.Fatalf("expected daily exclude rules in args: %v", args)
-	}
-	if !strings.Contains(joined, "--exclude-file "+filepath.Join(rulesDir, "wsl.exclude.weekly.txt")) {
-		t.Fatalf("expected weekly exclude rules in args: %v", args)
+	if !strings.Contains(joined, "--exclude-file "+filepath.Join(rulesDir, "wsl.exclude.txt")) {
+		t.Fatalf("expected profile exclude rules in args: %v", args)
 	}
 }
 
@@ -519,9 +516,9 @@ func TestBuildRunArgsMonthlyIncludesDailyWeeklyAndMonthlyRuleFiles(t *testing.T)
 		if !strings.Contains(joined, "--files-from "+filepath.Join(rulesDir, "wsl.include."+cadence+".txt")) {
 			t.Fatalf("expected %s include rules in args: %v", cadence, args)
 		}
-		if !strings.Contains(joined, "--exclude-file "+filepath.Join(rulesDir, "wsl.exclude."+cadence+".txt")) {
-			t.Fatalf("expected %s exclude rules in args: %v", cadence, args)
-		}
+	}
+	if !strings.Contains(joined, "--exclude-file "+filepath.Join(rulesDir, "wsl.exclude.txt")) {
+		t.Fatalf("expected profile exclude rules in args: %v", args)
 	}
 }
 
@@ -572,10 +569,10 @@ func TestValidateIncludeRuleOverlapAllowsExcludeOverlap(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "windows.include.daily.txt"), []byte("/data/windows\n"), 0o644); err != nil {
 		t.Fatalf("write include rules: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "wsl.exclude.daily.txt"), []byte("/mnt/c/Users/mike\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "wsl.exclude.txt"), []byte("/mnt/c/Users/mike\n"), 0o644); err != nil {
 		t.Fatalf("write exclude rules: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "windows.exclude.daily.txt"), []byte("C:\\Users\\mike\\docs\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "windows.exclude.txt"), []byte("C:\\Users\\mike\\docs\n"), 0o644); err != nil {
 		t.Fatalf("write exclude rules: %v", err)
 	}
 

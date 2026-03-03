@@ -23,7 +23,7 @@ func TestExecuteWindowsProfileBackupRunsResticExe(t *testing.T) {
 	rulesDir := t.TempDir()
 
 	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.include.daily.txt")] = "C:\\rules\\windows.include.daily.txt"
-	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.exclude.daily.txt")] = "C:\\rules\\windows.exclude.daily.txt"
+	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "windows.exclude.txt")] = "C:\\rules\\windows.exclude.txt"
 	fakeExec.runCapture["wslpath -w "+filepath.Join(os.TempDir(), "wsl-backup-restic-password-000.txt")] = "C:\\Temp\\wsl-backup-restic-password-000.txt"
 	args := []string{"--repo", `C:\repo`, "backup", "--files-from", filepath.Join(rulesDir, "windows.include.daily.txt")}
 
