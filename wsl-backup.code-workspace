@@ -1,13 +1,17 @@
 {
 	"folders": [
 		{
+			"name": ".agents",
+			"path": "/home/him/.agents"
+		},
+		{
+			"name": ".config-wsl-backup",
+			"path": "../../../../.config/wsl-backup"
+		},
+		{
 			"name": "wsl-backup-orchestrator",
 			"path": "."
 		},
-		{
-			"name": "config",
-			"path": "../../../../.config/wsl-backup"
-		}
 	],
 	"settings": {
 		"chat.tools.terminal.autoApprove": {
