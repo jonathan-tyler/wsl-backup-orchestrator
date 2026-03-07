@@ -18,7 +18,7 @@ Commands:
 
 Environment:
   BACKUP_CONFIG                  Optional config file path override
-  RESTIC_PASSWORD                Restic password value (manual or scheduled use)
+  RESTIC_PASSWORD                Restic password value (manual or scheduled use; manual prompts use hidden input)
   WSL_BACKUP_PASSWORD_FILE       Preferred password file path
   WSL_BACKUP_RESTIC_PASSWORD_FILE  Legacy alias for preferred password file path
   RESTIC_PASSWORD_FILE           Restic-compatible password file path

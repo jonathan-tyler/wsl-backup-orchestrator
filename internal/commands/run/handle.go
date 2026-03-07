@@ -25,11 +25,12 @@ type ConfigLoader interface {
 type fileStatFunc func(string) (os.FileInfo, error)
 
 type RunDependencies struct {
-	Loader  ConfigLoader
-	Stat    fileStatFunc
-	System  system.Executor
-	Confirm prompt.ConfirmFunc
-	Output  io.Writer
+	Loader         ConfigLoader
+	Stat           fileStatFunc
+	System         system.Executor
+	Confirm        prompt.ConfirmFunc
+	PasswordPrompt prompt.PasswordFunc
+	Output         io.Writer
 }
 
 type profileExecutionPlan struct {
@@ -45,11 +46,12 @@ type profileSnapshotPlan struct {
 
 func Handle(ctx context.Context, args []string, runner restic.Executor) error {
 	deps := RunDependencies{
-		Loader:  config.NewLoader(),
-		Stat:    os.Stat,
-		System:  system.NewOSExecutor(os.Stdout, os.Stderr),
-		Confirm: prompt.NewYesNoConfirm(os.Stdin, os.Stdout),
-		Output:  os.Stdout,
+		Loader:         config.NewLoader(),
+		Stat:           os.Stat,
+		System:         system.NewOSExecutor(os.Stdout, os.Stderr),
+		Confirm:        prompt.NewYesNoConfirm(os.Stdin, os.Stdout),
+		PasswordPrompt: prompt.NewPasswordPrompt(os.Stdin, os.Stdout),
+		Output:         os.Stdout,
 	}
 
 	return HandleWith(ctx, args, runner, deps)
@@ -77,6 +79,9 @@ func HandleWith(ctx context.Context, args []string, runner restic.Executor, deps
 	if deps.Confirm == nil {
 		deps.Confirm = func(string) (bool, error) { return false, nil }
 	}
+	if deps.PasswordPrompt == nil {
+		deps.PasswordPrompt = func(string) (string, error) { return "", restic.ErrPasswordNotConfigured }
+	}
 	if deps.Output == nil {
 		deps.Output = os.Stdout
 	}
@@ -90,7 +95,7 @@ func HandleWith(ctx context.Context, args []string, runner restic.Executor, deps
 		return err
 	}
 
-	if err := runPreflight(ctx, cfg, cadence, cfg.Profiles, deps.Stat, runner, deps.System, deps.Confirm); err != nil {
+	if err := runPreflight(ctx, cfg, cadence, cfg.Profiles, deps.Stat, runner, deps.System, deps.Confirm, deps.PasswordPrompt); err != nil {
 		return err
 	}
 

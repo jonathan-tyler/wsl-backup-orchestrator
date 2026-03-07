@@ -38,7 +38,8 @@ Thin, predictable wrapper around `restic`, run from WSL and usable as a `wsl-sys
   - `WSL_BACKUP_RESTIC_PASSWORD_FILE` (legacy alias)
   - `RESTIC_PASSWORD_FILE` (restic-compatible password file path)
   - systemd credentials directory (`$CREDENTIALS_DIRECTORY/restic_password`)
-- If no valid password source is available, the command fails fast with an error.
+- Manual `wsl-backup run ...` invocations prompt once for the password when a configured repository already exists and no password source is available. The prompt uses hidden terminal input and does not go through shell history. The entered value is exported to `RESTIC_PASSWORD` for the current process.
+- If no valid password source is available in non-interactive use, the command fails fast with an error.
 
 ## Usage
 

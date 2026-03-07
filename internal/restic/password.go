@@ -7,12 +7,14 @@ import (
 )
 
 const (
-	ResticPasswordFileEnv      = "RESTIC_PASSWORD_FILE"
-	BackupPasswordFileEnv      = "WSL_BACKUP_PASSWORD_FILE"
-	WSLBackupPasswordFileEnv   = "WSL_BACKUP_RESTIC_PASSWORD_FILE"
-	SystemdCredentialsDirEnv   = "CREDENTIALS_DIRECTORY"
-	SystemdResticPasswordCred  = "restic_password"
+	ResticPasswordFileEnv     = "RESTIC_PASSWORD_FILE"
+	BackupPasswordFileEnv     = "WSL_BACKUP_PASSWORD_FILE"
+	WSLBackupPasswordFileEnv  = "WSL_BACKUP_RESTIC_PASSWORD_FILE"
+	SystemdCredentialsDirEnv  = "CREDENTIALS_DIRECTORY"
+	SystemdResticPasswordCred = "restic_password"
 )
+
+var ErrPasswordNotConfigured = fmt.Errorf("restic password is not configured")
 
 func loadResticPassword() (string, error) {
 	if envPassword := strings.TrimSpace(os.Getenv("RESTIC_PASSWORD")); envPassword != "" {
@@ -42,7 +44,7 @@ func loadResticPassword() (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("restic password is not configured: set RESTIC_PASSWORD, %s, %s, %s, or provide systemd credential %q", BackupPasswordFileEnv, WSLBackupPasswordFileEnv, ResticPasswordFileEnv, SystemdResticPasswordCred)
+	return "", fmt.Errorf("%w: set RESTIC_PASSWORD, %s, %s, %s, or provide systemd credential %q", ErrPasswordNotConfigured, BackupPasswordFileEnv, WSLBackupPasswordFileEnv, ResticPasswordFileEnv, SystemdResticPasswordCred)
 }
 
 func CheckPasswordConfigured() error {

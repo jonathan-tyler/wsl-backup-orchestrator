@@ -2,6 +2,7 @@ package run
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -22,22 +23,26 @@ func runPreflight(
 	runner restic.Executor,
 	exec system.Executor,
 	confirm prompt.ConfirmFunc,
+	passwordPrompt prompt.PasswordFunc,
 ) error {
 	if err := validateRuleFilesExist(cfg.Dir(), cadence, profiles, stat); err != nil {
 		return err
 	}
 
 	if hasProfiles(profiles) {
-		if err := restic.CheckPasswordConfigured(); err != nil {
-			return err
-		}
 		if err := validateRepositoryUniqueness(profiles); err != nil {
 			return err
 		}
 	}
 
 	for profileName, profile := range profiles {
-		if err := ensureRepositoryReady(ctx, profileName, profile, stat, runner, exec, confirm); err != nil {
+		if err := ensureRepositoryReady(ctx, profileName, profile, stat, runner, exec, confirm, passwordPrompt); err != nil {
+			return err
+		}
+	}
+
+	if hasProfiles(profiles) {
+		if err := ensureResticPassword(profiles, stat, passwordPrompt, false); err != nil {
 			return err
 		}
 	}
@@ -112,6 +117,7 @@ func ensureRepositoryReady(
 	runner restic.Executor,
 	exec system.Executor,
 	confirm prompt.ConfirmFunc,
+	passwordPrompt prompt.PasswordFunc,
 ) error {
 	repository := profile.Repository
 	if strings.TrimSpace(repository) == "" {
@@ -140,6 +146,10 @@ func ensureRepositoryReady(
 		return fmt.Errorf("profile %s repository missing: %s", profileName, repository)
 	}
 
+	if err := ensureResticPassword(map[string]config.Profile{profileName: profile}, stat, passwordPrompt, true); err != nil {
+		return err
+	}
+
 	if strings.EqualFold(profileName, "windows") {
 		if err := runWindowsResticCommand(ctx, []string{"init", "--repo", repository}, false, exec); err != nil {
 			return fmt.Errorf("profile %s repository init failed: %w", profileName, err)
@@ -151,6 +161,56 @@ func ensureRepositoryReady(
 		return fmt.Errorf("profile %s repository init failed: %w", profileName, err)
 	}
 	return nil
+}
+
+func ensureResticPassword(
+	profiles map[string]config.Profile,
+	stat fileStatFunc,
+	passwordPrompt prompt.PasswordFunc,
+	forcePrompt bool,
+) error {
+	if err := restic.CheckPasswordConfigured(); err == nil {
+		return nil
+	} else if !errors.Is(err, restic.ErrPasswordNotConfigured) {
+		return err
+	} else if !forcePrompt {
+		hasExistingRepository, existsErr := anyRepositoryExists(profiles, stat)
+		if existsErr != nil {
+			return existsErr
+		}
+		if !hasExistingRepository {
+			return err
+		}
+	}
+
+	if passwordPrompt == nil {
+		return restic.ErrPasswordNotConfigured
+	}
+
+	password, promptErr := passwordPrompt("Restic password")
+	if promptErr != nil {
+		return fmt.Errorf("restic password prompt failed: %w", promptErr)
+	}
+
+	if err := os.Setenv("RESTIC_PASSWORD", strings.TrimSpace(password)); err != nil {
+		return fmt.Errorf("set RESTIC_PASSWORD: %w", err)
+	}
+
+	return nil
+}
+
+func anyRepositoryExists(profiles map[string]config.Profile, stat fileStatFunc) (bool, error) {
+	for profileName, profile := range profiles {
+		exists, checked, err := repositoryConfigExists(profileName, profile.Repository, stat)
+		if err != nil {
+			return false, fmt.Errorf("profile %s repository check failed: %w", profileName, err)
+		}
+		if checked && exists {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func repositoryConfigExists(profileName string, repository string, stat fileStatFunc) (bool, bool, error) {

@@ -332,6 +332,108 @@ func TestHandleFailsWhenPasswordMissing(t *testing.T) {
 	}
 }
 
+func TestHandlePromptsForPasswordWhenRepositoryExists(t *testing.T) {
+	rulesDir := withTempRules(t, "daily", []string{"wsl"}, []string{"wsl"})
+	wslRepo := withTempRepository(t)
+	runner := &fakeRunner{}
+	loader := fakeLoader{cfg: config.File{
+		Profiles: map[string]config.Profile{"wsl": {Repository: wslRepo}},
+	}}
+	loader.cfgPathSetForTest(rulesDir)
+	t.Setenv("RESTIC_PASSWORD", "")
+
+	prompted := false
+	err := HandleWith(context.Background(), []string{"daily"}, runner, RunDependencies{
+		Loader: loader,
+		Stat:   os.Stat,
+		PasswordPrompt: func(message string) (string, error) {
+			prompted = true
+			if message != "Restic password" {
+				t.Fatalf("unexpected prompt message %q", message)
+			}
+			return "prompted-secret", nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if !prompted {
+		t.Fatalf("expected password prompt")
+	}
+	if got := os.Getenv("RESTIC_PASSWORD"); got != "prompted-secret" {
+		t.Fatalf("expected RESTIC_PASSWORD to be set, got %q", got)
+	}
+	if len(runner.calls) == 0 {
+		t.Fatalf("expected restic runner calls")
+	}
+	if !strings.Contains(strings.Join(runner.calls[0], " "), "backup") {
+		t.Fatalf("expected backup command, got %v", runner.calls[0])
+	}
+}
+
+func TestHandleFailsWhenPasswordPromptFails(t *testing.T) {
+	rulesDir := withTempRules(t, "daily", []string{"wsl"}, []string{"wsl"})
+	wslRepo := withTempRepository(t)
+	runner := &fakeRunner{}
+	loader := fakeLoader{cfg: config.File{
+		Profiles: map[string]config.Profile{"wsl": {Repository: wslRepo}},
+	}}
+	loader.cfgPathSetForTest(rulesDir)
+	t.Setenv("RESTIC_PASSWORD", "")
+
+	err := HandleWith(context.Background(), []string{"daily"}, runner, RunDependencies{
+		Loader: loader,
+		Stat:   os.Stat,
+		PasswordPrompt: func(string) (string, error) {
+			return "", fmt.Errorf("prompt failed")
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(err.Error(), "restic password prompt failed") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestHandlePromptsForPasswordBeforeRepositoryInit(t *testing.T) {
+	rulesDir := withTempRules(t, "daily", []string{"wsl"}, []string{"wsl"})
+	runner := &fakeRunner{}
+	missingRepo := filepath.Join(t.TempDir(), "missing-repo")
+	loader := fakeLoader{cfg: config.File{
+		Profiles: map[string]config.Profile{
+			"wsl": {Repository: missingRepo},
+		},
+	}}
+	loader.cfgPathSetForTest(rulesDir)
+	t.Setenv("RESTIC_PASSWORD", "")
+
+	prompted := false
+	err := HandleWith(context.Background(), []string{"daily"}, runner, RunDependencies{
+		Loader: loader,
+		Stat:   os.Stat,
+		Confirm: func(string) (bool, error) {
+			return true, nil
+		},
+		PasswordPrompt: func(string) (string, error) {
+			prompted = true
+			return "prompted-secret", nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if !prompted {
+		t.Fatalf("expected password prompt")
+	}
+	if len(runner.calls) == 0 {
+		t.Fatalf("expected init call")
+	}
+	if !strings.Contains(strings.Join(runner.calls[0], " "), "init --repo") {
+		t.Fatalf("expected init call, got %v", runner.calls[0])
+	}
+}
+
 func TestHandleFailsWhenProfilesShareNormalizedRepository(t *testing.T) {
 	t.Setenv("RESTIC_PASSWORD", "test-password")
 
