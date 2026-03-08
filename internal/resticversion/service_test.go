@@ -7,10 +7,14 @@ import (
 	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/config"
 )
 
+func testProfile(repository string) config.Profile {
+	return config.Profile{Repositories: config.Repositories{Daily: repository, Weekly: repository, Monthly: repository}}
+}
+
 func TestCheckCompatibleNoActionWhenMatching(t *testing.T) {
 	exec := &fakeSystemExecutor{
 		captureOutput: map[string]string{
-			"restic version":                             "restic 0.18.1 compiled with go1.24",
+			"restic version": "restic 0.18.1 compiled with go1.24",
 			"pwsh.exe -NoProfile -Command restic version": "restic 0.18.1 compiled with go1.24",
 		},
 		captureErr: map[string]error{},
@@ -20,8 +24,8 @@ func TestCheckCompatibleNoActionWhenMatching(t *testing.T) {
 	err := CheckCompatible(context.Background(), config.File{
 		ResticVersion: "0.18.1",
 		Profiles: map[string]config.Profile{
-			"wsl":     {Repository: "/repo/wsl"},
-			"windows": {Repository: `C:\repo`},
+			"wsl":     testProfile("/repo/wsl"),
+			"windows": testProfile(`C:\repo`),
 		},
 	}, exec)
 

@@ -18,7 +18,7 @@ func TestCheckCompatibleFailsWithSetupHintOnWindowsMismatch(t *testing.T) {
 
 	err := CheckCompatible(context.Background(), config.File{
 		ResticVersion: "0.18.1",
-		Profiles:      map[string]config.Profile{"windows": {Repository: `C:\repo`}},
+		Profiles:      map[string]config.Profile{"windows": testProfile(`C:\repo`)},
 	}, exec)
 
 	if err == nil {
@@ -40,7 +40,7 @@ func TestSyncInteractiveWindowsUpdateDeclinedReturnsError(t *testing.T) {
 
 	err := SyncInteractive(context.Background(), config.File{
 		ResticVersion: "0.18.1",
-		Profiles:      map[string]config.Profile{"windows": {Repository: `C:\repo`}},
+		Profiles:      map[string]config.Profile{"windows": testProfile(`C:\repo`)},
 	}, exec, func(string) (bool, error) {
 		return false, nil
 	})
@@ -65,7 +65,7 @@ func TestSyncInteractiveWithReportReturnsWindowsFailedStatusOnDecline(t *testing
 
 	report, err := SyncInteractiveWithReport(context.Background(), config.File{
 		ResticVersion: "0.18.1",
-		Profiles:      map[string]config.Profile{"windows": {Repository: `C:\repo`}},
+		Profiles:      map[string]config.Profile{"windows": testProfile(`C:\repo`)},
 	}, exec, func(string) (bool, error) { return false, nil })
 
 	if err == nil {

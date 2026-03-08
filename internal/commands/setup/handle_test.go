@@ -14,6 +14,10 @@ import (
 	"github.com/jonathan-tyler/wsl-backup-orchestrator/internal/resticversion"
 )
 
+func testProfile(repository string) config.Profile {
+	return config.Profile{Repositories: config.Repositories{Daily: repository, Weekly: repository, Monthly: repository}}
+}
+
 type fakeLoader struct {
 	cfg config.File
 	err error
@@ -59,7 +63,7 @@ func TestHandleWithRunsSyncAndPasses(t *testing.T) {
 		Loader: fakeLoader{cfg: config.File{
 			ResticVersion: "0.18.1",
 			Profiles: map[string]config.Profile{
-				"wsl": {Repository: "/repo/wsl"},
+				"wsl": testProfile("/repo/wsl"),
 			},
 		}},
 		System: fakeSystem{runCaptureOutput: "restic 0.18.1 compiled with go"},
@@ -170,7 +174,10 @@ func TestHandleWithReportDefaultsAllDependencies(t *testing.T) {
 	content := []byte(`restic_version: ""
 profiles:
   wsl:
-    repository: /repo/wsl
+    repositories:
+      daily: /repo/wsl-daily
+      weekly: /repo/wsl-weekly
+      monthly: /repo/wsl-monthly
     use_fs_snapshot: false
 `)
 	if err := os.WriteFile(configPath, content, 0o600); err != nil {
@@ -205,7 +212,7 @@ func TestHandleWithUsesDefaultConfirmWhenNil(t *testing.T) {
 		Loader: fakeLoader{cfg: config.File{
 			ResticVersion: "",
 			Profiles: map[string]config.Profile{
-				"wsl": {Repository: "/repo/wsl"},
+				"wsl": testProfile("/repo/wsl"),
 			},
 		}},
 		System: fakeSystem{},

@@ -135,7 +135,7 @@ func HandleWith(ctx context.Context, args []string, runner restic.Executor, deps
 		}
 	}
 	if len(profileErrs) == 0 {
-		snapshotPlans, err := buildProfileSnapshotPlans(cfg.Profiles)
+		snapshotPlans, err := buildProfileSnapshotPlans(cfg.Profiles, cadence)
 		if err != nil {
 			return err
 		}
@@ -154,11 +154,14 @@ func HandleWith(ctx context.Context, args []string, runner restic.Executor, deps
 	return errors.Join(profileErrs...)
 }
 
-func buildProfileSnapshotPlans(profiles map[string]config.Profile) ([]profileSnapshotPlan, error) {
+func buildProfileSnapshotPlans(profiles map[string]config.Profile, cadence string) ([]profileSnapshotPlan, error) {
 	profileNames := sortedProfileNames(profiles)
 	plans := make([]profileSnapshotPlan, 0, len(profileNames))
 	for _, profileName := range profileNames {
-		repository := profiles[profileName].Repository
+		repository, err := profiles[profileName].RepositoryFor(cadence)
+		if err != nil {
+			return nil, fmt.Errorf("profile %s repository lookup failed: %w", profileName, err)
+		}
 		if strings.EqualFold(profileName, "windows") && looksLikeWindowsPath(repository) {
 			converted, ok := windowsPathToWSL(repository)
 			if !ok {
@@ -184,7 +187,12 @@ func isValidCadence(value string) bool {
 }
 
 func buildRunArgs(configDir string, profileName string, profile config.Profile, cadence string, extraArgs []string, stat fileStatFunc) ([]string, error) {
-	resticArgs := []string{"--repo", profile.Repository, "backup", "--tag", "cadence=" + cadence, "--tag", "profile=" + profileName}
+	repository, err := profile.RepositoryFor(cadence)
+	if err != nil {
+		return nil, fmt.Errorf("profile %s repository lookup failed: %w", profileName, err)
+	}
+
+	resticArgs := []string{"--repo", repository, "backup", "--tag", "cadence=" + cadence, "--tag", "profile=" + profileName}
 
 	if strings.EqualFold(profileName, "windows") && profile.UseFSSnapshot {
 		resticArgs = append(resticArgs, "--use-fs-snapshot")

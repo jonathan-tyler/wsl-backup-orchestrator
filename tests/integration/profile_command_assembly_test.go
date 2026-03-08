@@ -137,8 +137,8 @@ func TestRunAssemblesProfileCommandsForWSLAndWindows(t *testing.T) {
 	loader := fakeLoader{cfg: config.FileWithPathForTest(config.File{
 		ResticVersion: "0.18.1",
 		Profiles: map[string]config.Profile{
-			"wsl":     {Repository: wslRepo},
-			"windows": {Repository: windowsRepo, UseFSSnapshot: false},
+			"wsl":     {Repositories: config.Repositories{Daily: wslRepo, Weekly: wslRepo, Monthly: wslRepo}},
+			"windows": {Repositories: config.Repositories{Daily: windowsRepo, Weekly: windowsRepo, Monthly: windowsRepo}, UseFSSnapshot: false},
 		},
 	}, filepath.Join(rulesDir, "config.yaml"))}
 

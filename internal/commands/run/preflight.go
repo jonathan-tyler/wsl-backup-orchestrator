@@ -30,19 +30,19 @@ func runPreflight(
 	}
 
 	if hasProfiles(profiles) {
-		if err := validateRepositoryUniqueness(profiles); err != nil {
+		if err := validateRepositoryUniquenessAllCadences(profiles); err != nil {
 			return err
 		}
 	}
 
-	for profileName, profile := range profiles {
-		if err := ensureRepositoryReady(ctx, profileName, profile, stat, runner, exec, confirm, passwordPrompt); err != nil {
+	for _, repositoryTarget := range repositoryTargetsForProfiles(profiles) {
+		if err := ensureRepositoryReady(ctx, repositoryTarget.profileName, repositoryTarget.profile, repositoryTarget.cadence, stat, runner, exec, confirm, passwordPrompt); err != nil {
 			return err
 		}
 	}
 
 	if hasProfiles(profiles) {
-		if err := ensureResticPassword(profiles, stat, passwordPrompt, false); err != nil {
+		if err := ensureResticPassword(profiles, cadence, stat, passwordPrompt, false); err != nil {
 			return err
 		}
 	}
@@ -50,24 +50,58 @@ func runPreflight(
 	return nil
 }
 
-func validateRepositoryUniqueness(profiles map[string]config.Profile) error {
+type repositoryTarget struct {
+	profileName string
+	profile     config.Profile
+	cadence     string
+}
+
+func repositoryTargetsForProfiles(profiles map[string]config.Profile) []repositoryTarget {
+	profileNames := sortedProfileNames(profiles)
+	targets := make([]repositoryTarget, 0, len(profileNames)*3)
+	for _, profileName := range profileNames {
+		profile := profiles[profileName]
+		for _, cadence := range []string{"daily", "weekly", "monthly"} {
+			targets = append(targets, repositoryTarget{profileName: profileName, profile: profile, cadence: cadence})
+		}
+	}
+
+	return targets
+}
+
+func validateRepositoryUniquenessAllCadences(profiles map[string]config.Profile) error {
+	for _, cadence := range []string{"daily", "weekly", "monthly"} {
+		if err := validateRepositoryUniqueness(profiles, cadence); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateRepositoryUniqueness(profiles map[string]config.Profile, cadence string) error {
 	seen := map[string]string{}
 	raw := map[string]string{}
 
 	for profileName, profile := range profiles {
-		normalized := normalizePath(profile.Repository)
+		repository, err := profile.RepositoryFor(cadence)
+		if err != nil {
+			return fmt.Errorf("profile %s repository lookup failed: %w", profileName, err)
+		}
+		normalized := normalizePath(repository)
 		if priorProfile, exists := seen[normalized]; exists {
 			return fmt.Errorf(
-				"profiles %s and %s target the same repository after normalization: %q and %q",
+				"profiles %s and %s target the same %s repository after normalization: %q and %q",
 				priorProfile,
 				profileName,
+				cadence,
 				raw[normalized],
-				profile.Repository,
+				repository,
 			)
 		}
 
 		seen[normalized] = profileName
-		raw[normalized] = profile.Repository
+		raw[normalized] = repository
 	}
 
 	return nil
@@ -113,15 +147,19 @@ func ensureRepositoryReady(
 	ctx context.Context,
 	profileName string,
 	profile config.Profile,
+	cadence string,
 	stat fileStatFunc,
 	runner restic.Executor,
 	exec system.Executor,
 	confirm prompt.ConfirmFunc,
 	passwordPrompt prompt.PasswordFunc,
 ) error {
-	repository := profile.Repository
+	repository, err := profile.RepositoryFor(cadence)
+	if err != nil {
+		return fmt.Errorf("profile %s repository lookup failed: %w", profileName, err)
+	}
 	if strings.TrimSpace(repository) == "" {
-		return fmt.Errorf("profile %s has empty repository", profileName)
+		return fmt.Errorf("profile %s has empty %s repository", profileName, cadence)
 	}
 
 	exists, checked, err := repositoryConfigExists(profileName, repository, stat)
@@ -134,7 +172,7 @@ func ensureRepositoryReady(
 
 	create := false
 	if confirm != nil {
-		promptText := fmt.Sprintf("Repository for profile %s is missing at %s. Create it now?", profileName, repository)
+		promptText := fmt.Sprintf("Repository for profile %s cadence %s is missing at %s. Create it now?", profileName, cadence, repository)
 		answer, confirmErr := confirm(promptText)
 		if confirmErr != nil {
 			return fmt.Errorf("profile %s repository creation prompt failed: %w", profileName, confirmErr)
@@ -143,10 +181,10 @@ func ensureRepositoryReady(
 	}
 
 	if !create {
-		return fmt.Errorf("profile %s repository missing: %s", profileName, repository)
+		return fmt.Errorf("profile %s %s repository missing: %s", profileName, cadence, repository)
 	}
 
-	if err := ensureResticPassword(map[string]config.Profile{profileName: profile}, stat, passwordPrompt, true); err != nil {
+	if err := ensureResticPassword(map[string]config.Profile{profileName: profile}, cadence, stat, passwordPrompt, true); err != nil {
 		return err
 	}
 
@@ -165,6 +203,7 @@ func ensureRepositoryReady(
 
 func ensureResticPassword(
 	profiles map[string]config.Profile,
+	cadence string,
 	stat fileStatFunc,
 	passwordPrompt prompt.PasswordFunc,
 	forcePrompt bool,
@@ -174,7 +213,7 @@ func ensureResticPassword(
 	} else if !errors.Is(err, restic.ErrPasswordNotConfigured) {
 		return err
 	} else if !forcePrompt {
-		hasExistingRepository, existsErr := anyRepositoryExists(profiles, stat)
+		hasExistingRepository, existsErr := anyRepositoryExists(profiles, cadence, stat)
 		if existsErr != nil {
 			return existsErr
 		}
@@ -199,9 +238,13 @@ func ensureResticPassword(
 	return nil
 }
 
-func anyRepositoryExists(profiles map[string]config.Profile, stat fileStatFunc) (bool, error) {
+func anyRepositoryExists(profiles map[string]config.Profile, cadence string, stat fileStatFunc) (bool, error) {
 	for profileName, profile := range profiles {
-		exists, checked, err := repositoryConfigExists(profileName, profile.Repository, stat)
+		repository, err := profile.RepositoryFor(cadence)
+		if err != nil {
+			return false, fmt.Errorf("profile %s repository lookup failed: %w", profileName, err)
+		}
+		exists, checked, err := repositoryConfigExists(profileName, repository, stat)
 		if err != nil {
 			return false, fmt.Errorf("profile %s repository check failed: %w", profileName, err)
 		}

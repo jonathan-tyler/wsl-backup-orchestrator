@@ -4,13 +4,37 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
+type Repositories struct {
+	Daily   string `yaml:"daily"`
+	Weekly  string `yaml:"weekly"`
+	Monthly string `yaml:"monthly"`
+}
+
+func (r Repositories) ForCadence(cadence string) (string, error) {
+	switch cadence {
+	case "daily":
+		return strings.TrimSpace(r.Daily), nil
+	case "weekly":
+		return strings.TrimSpace(r.Weekly), nil
+	case "monthly":
+		return strings.TrimSpace(r.Monthly), nil
+	default:
+		return "", fmt.Errorf("unsupported cadence %q", cadence)
+	}
+}
+
 type Profile struct {
-	Repository    string `yaml:"repository"`
-	UseFSSnapshot bool   `yaml:"use_fs_snapshot"`
+	Repositories  Repositories `yaml:"repositories"`
+	UseFSSnapshot bool         `yaml:"use_fs_snapshot"`
+}
+
+func (p Profile) RepositoryFor(cadence string) (string, error) {
+	return p.Repositories.ForCadence(cadence)
 }
 
 type File struct {
@@ -88,8 +112,14 @@ func validate(cfg File) error {
 	}
 
 	for profileName, profile := range cfg.Profiles {
-		if profile.Repository == "" {
-			return fmt.Errorf("profile %q has empty repository", profileName)
+		for _, cadence := range []string{"daily", "weekly", "monthly"} {
+			repository, err := profile.RepositoryFor(cadence)
+			if err != nil {
+				return fmt.Errorf("profile %q repository lookup failed: %w", profileName, err)
+			}
+			if repository == "" {
+				return fmt.Errorf("profile %q has empty %s repository", profileName, cadence)
+			}
 		}
 		if profile.UseFSSnapshot && profileName != "windows" {
 			return fmt.Errorf("profile %q enables use_fs_snapshot, but use_fs_snapshot is supported only for the windows profile", profileName)

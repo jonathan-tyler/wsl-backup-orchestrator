@@ -18,7 +18,7 @@ func TestCheckCompatibleFailsWithSetupHintOnWSLMismatch(t *testing.T) {
 
 	err := CheckCompatible(context.Background(), config.File{
 		ResticVersion: "0.18.1",
-		Profiles:      map[string]config.Profile{"wsl": {Repository: "/repo/wsl"}},
+		Profiles:      map[string]config.Profile{"wsl": testProfile("/repo/wsl")},
 	}, exec)
 
 	if err == nil {
@@ -40,7 +40,7 @@ func TestSyncInteractiveInstallsWSLWhenMissingAndApproved(t *testing.T) {
 
 	err := SyncInteractive(context.Background(), config.File{
 		ResticVersion: "0.18.1",
-		Profiles:      map[string]config.Profile{"wsl": {Repository: "/repo/wsl"}},
+		Profiles:      map[string]config.Profile{"wsl": testProfile("/repo/wsl")},
 	}, exec, func(string) (bool, error) {
 		return true, nil
 	})
@@ -65,7 +65,7 @@ func TestSyncInteractiveWithReportReturnsWSLMatchedStatus(t *testing.T) {
 
 	report, err := SyncInteractiveWithReport(context.Background(), config.File{
 		ResticVersion: "0.18.1",
-		Profiles:      map[string]config.Profile{"wsl": {Repository: "/repo/wsl"}},
+		Profiles:      map[string]config.Profile{"wsl": testProfile("/repo/wsl")},
 	}, exec, func(string) (bool, error) { return true, nil })
 
 	if err != nil {

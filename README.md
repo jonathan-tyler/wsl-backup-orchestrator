@@ -16,6 +16,7 @@ Thin, predictable wrapper around `restic`, run from WSL and usable as a `wsl-sys
 - Optional config override: `BACKUP_CONFIG=/path/to/config.yaml`
 - Starter config: [config.example.yaml](config.example.yaml)
 - Rule file directory: `~/.config/wsl-backup/`
+- Each profile must define `repositories.daily`, `repositories.weekly`, and `repositories.monthly`.
 - Rule naming:
   - Include: `includes.<daily|weekly|monthly>.txt`
   - Exclude: `excludes.txt`
@@ -24,10 +25,10 @@ Thin, predictable wrapper around `restic`, run from WSL and usable as a `wsl-sys
     - `weekly` uses `*.daily.txt` + `*.weekly.txt`
     - `monthly` uses `*.daily.txt` + `*.weekly.txt` + `*.monthly.txt`
   - Include and exclude rules are authored from the WSL path perspective
-  - Configure local repository paths in WSL form (for example, `/mnt/c/backups/repo`)
+  - Configure per-cadence repository paths in WSL form (for example, `/mnt/c/backups/repo-daily`)
   - WSL runs filter include entries that start with `/mnt/<drive>/` before invoking `restic`
   - Windows runs translate local WSL paths, including rule entries and `--repo`, into `X:\...` before invoking `restic.exe`
-  - Profile repositories are normalized and must be unique (for example, `/mnt/c/backups/repo` and `C:\\backups\\repo` are treated as the same target)
+  - Profile repositories for the active cadence are normalized and must be unique (for example, `/mnt/c/backups/repo` and `C:\backups\repo` are treated as the same target)
 
 ## Authentication
 
@@ -46,6 +47,7 @@ Thin, predictable wrapper around `restic`, run from WSL and usable as a `wsl-sys
 - This CLI is WSL-only; run it from a WSL shell (not from native Windows or a Dev Container).
 
 - `wsl-backup run` performs a fast preflight check and fails fast on missing/mismatched restic versions.
+- Before starting any backup, `wsl-backup run` validates repository paths for `daily`, `weekly`, and `monthly` across configured profiles. Missing repositories are offered for creation up front; declining any creation prompt exits the run.
 - If preflight fails, run `wsl-backup setup` to install/upgrade `restic` across configured profiles.
 
 ### Typical flow
@@ -58,6 +60,7 @@ wsl-backup setup
 wsl-backup run daily
 wsl-backup run weekly
 wsl-backup run monthly
+wsl-backup run daily --dry-run
 
 # Restore examples
 wsl-backup restore /tmp/restore-target
@@ -82,6 +85,7 @@ wsl-backup run daily
   - Missing include rule files fail fast for all inherited cadences.
   - Missing exclude rule file (`excludes.txt`) fails fast.
 
+- `wsl-backup run <cadence> --dry-run` passes `--dry-run` to `restic backup` for each configured profile and performs a non-writing preview. The follow-up `snapshots` listing remains read-only.
 - `wsl-backup restore <target> --dry-run` passes `--dry-run` to `restic restore` and performs a non-writing preview restore.
 - Additional restore args are forwarded after `--dry-run` (for example include/exclude filters).
 

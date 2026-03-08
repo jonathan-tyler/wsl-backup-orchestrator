@@ -288,7 +288,7 @@ func TestRunCadenceInheritanceSnapshotFileCounts(t *testing.T) {
 	loader := snapshotLoader{cfg: config.FileWithPathForTest(config.File{
 		ResticVersion: "0.18.1",
 		Profiles: map[string]config.Profile{
-			"wsl": {Repository: repositoryDir},
+			"wsl": {Repositories: config.Repositories{Daily: repositoryDir, Weekly: repositoryDir, Monthly: repositoryDir}},
 		},
 	}, filepath.Join(rulesDir, "config.yaml"))}
 

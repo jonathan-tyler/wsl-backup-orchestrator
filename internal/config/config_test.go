@@ -7,6 +7,10 @@ import (
 	"testing"
 )
 
+func sameRepositories(repository string) Repositories {
+	return Repositories{Daily: repository, Weekly: repository, Monthly: repository}
+}
+
 func TestFileDirAndPath(t *testing.T) {
 	var cfg File
 	if cfg.Path() != "" {
@@ -124,9 +128,15 @@ func TestLoadParsesConfig(t *testing.T) {
 			return []byte(`restic_version: "0.18.1"
 profiles:
   wsl:
-    repository: /repo/wsl
+    repositories:
+      daily: /repo/wsl-daily
+      weekly: /repo/wsl-weekly
+      monthly: /repo/wsl-monthly
   windows:
-    repository: /mnt/c/repo/windows
+    repositories:
+      daily: /mnt/c/repo/windows-daily
+      weekly: /mnt/c/repo/windows-weekly
+      monthly: /mnt/c/repo/windows-monthly
     use_fs_snapshot: true
 `), nil
 		},
@@ -139,7 +149,11 @@ profiles:
 	if cfg.Path() != "/tmp/config.yaml" {
 		t.Fatalf("unexpected config path: %q", cfg.Path())
 	}
-	if cfg.Profiles["wsl"].Repository != "/repo/wsl" {
+	wslDaily, err := cfg.Profiles["wsl"].RepositoryFor("daily")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if wslDaily != "/repo/wsl-daily" {
 		t.Fatalf("unexpected repository")
 	}
 	if !cfg.Profiles["windows"].UseFSSnapshot {
@@ -158,7 +172,10 @@ func TestLoadFailsWhenWSLUsesFSSnapshot(t *testing.T) {
 		ReadFile: func(string) ([]byte, error) {
 			return []byte(`profiles:
   wsl:
-    repository: /repo/wsl
+    repositories:
+      daily: /repo/wsl-daily
+      weekly: /repo/wsl-weekly
+      monthly: /repo/wsl-monthly
     use_fs_snapshot: true
 `), nil
 		},
@@ -184,7 +201,10 @@ func TestLoadFailsWhenProfileRepositoryMissing(t *testing.T) {
 		ReadFile: func(string) ([]byte, error) {
 			return []byte(`profiles:
   wsl:
-    repository: ""
+    repositories:
+      daily: ""
+      weekly: /repo/wsl-weekly
+      monthly: /repo/wsl-monthly
 `), nil
 		},
 	}
@@ -193,7 +213,7 @@ func TestLoadFailsWhenProfileRepositoryMissing(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error")
 	}
-	if !strings.Contains(err.Error(), "empty repository") {
+	if !strings.Contains(err.Error(), "empty daily repository") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

@@ -10,9 +10,15 @@
 restic_version: "0.18.1"
 profiles:
   wsl:
-    repository: /path/to/restic-repo
+    repositories:
+      daily: /path/to/restic-repo-daily
+      weekly: /path/to/restic-repo-weekly
+      monthly: /path/to/restic-repo-monthly
 
   windows:
-    repository: /mnt/c/path/to/restic-repo
+    repositories:
+      daily: /mnt/c/path/to/restic-repo-daily
+      weekly: /mnt/c/path/to/restic-repo-weekly
+      monthly: /mnt/c/path/to/restic-repo-monthly
     use_fs_snapshot: true
     # When enabled, wsl-backup runs through an elevated Windows process (UAC prompt).

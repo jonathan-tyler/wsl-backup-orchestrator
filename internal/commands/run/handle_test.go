@@ -161,6 +161,26 @@ func withTempRepository(t *testing.T) string {
 	return dir
 }
 
+func testProfile(repository string) config.Profile {
+	return config.Profile{
+		Repositories: config.Repositories{
+			Daily:   repository,
+			Weekly:  repository,
+			Monthly: repository,
+		},
+	}
+}
+
+func testProfileRepositories(daily string, weekly string, monthly string) config.Profile {
+	return config.Profile{
+		Repositories: config.Repositories{
+			Daily:   daily,
+			Weekly:  weekly,
+			Monthly: monthly,
+		},
+	}
+}
+
 func TestHandleRequiresCadence(t *testing.T) {
 	err := HandleWith(context.Background(), nil, &fakeRunner{}, RunDependencies{Loader: fakeLoader{}, Stat: os.Stat})
 	if err == nil {
@@ -194,8 +214,12 @@ func TestHandleRunsConfiguredProfiles(t *testing.T) {
 	loader := fakeLoader{cfg: config.File{
 		ResticVersion: "0.18.1",
 		Profiles: map[string]config.Profile{
-			"windows": {Repository: windowsRepo, UseFSSnapshot: false},
-			"wsl":     {Repository: wslRepo, UseFSSnapshot: false},
+			"windows": func() config.Profile {
+				profile := testProfile(windowsRepo)
+				profile.UseFSSnapshot = false
+				return profile
+			}(),
+			"wsl": func() config.Profile { profile := testProfile(wslRepo); profile.UseFSSnapshot = false; return profile }(),
 		},
 	}}
 	loader.cfgPathSetForTest(rulesDir)
@@ -295,12 +319,96 @@ func TestHandleRunsConfiguredProfiles(t *testing.T) {
 	}
 }
 
+func TestHandlePassesDryRunToBackupProfiles(t *testing.T) {
+	t.Setenv("RESTIC_PASSWORD", "test-password")
+
+	rulesDir := withTempRules(t, "daily", []string{"wsl", "windows"}, []string{"wsl", "windows"})
+	wslRepo := withTempRepository(t)
+	windowsRepo := withTempRepository(t)
+	runner := &fakeRunner{}
+	fakeExec := &fakeSystem{runCapture: map[string]string{}}
+	loader := fakeLoader{cfg: config.File{
+		ResticVersion: "0.18.1",
+		Profiles: map[string]config.Profile{
+			"windows": func() config.Profile {
+				profile := testProfile(windowsRepo)
+				profile.UseFSSnapshot = false
+				return profile
+			}(),
+			"wsl": func() config.Profile { profile := testProfile(wslRepo); profile.UseFSSnapshot = false; return profile }(),
+		},
+	}}
+	loader.cfgPathSetForTest(rulesDir)
+	fakeExec.runCapture["restic version"] = "restic 0.18.1 compiled with go"
+	fakeExec.runCapture["pwsh.exe -NoProfile -Command restic version"] = "restic 0.18.1 compiled with go"
+	fakeExec.runCapture["wslpath -w "+filepath.Join(os.TempDir(), "wsl-backup-orchestrator-rule-001.txt")] = "C:\\rules\\includes.daily.txt"
+	fakeExec.runCapture["wslpath -w "+filepath.Join(os.TempDir(), "wsl-backup-orchestrator-rule-002.txt")] = "C:\\rules\\excludes.txt"
+	fakeExec.runCapture["wslpath -w "+filepath.Join(rulesDir, "excludes.txt")] = "C:\\rules\\excludes.txt"
+
+	originalCreateTemp := osCreateTemp
+	createTempIndex := 0
+	osCreateTemp = func(_ string, pattern string) (*os.File, error) {
+		createTempIndex++
+		name := fmt.Sprintf("wsl-backup-orchestrator-rule-%03d.txt", createTempIndex)
+		if strings.Contains(pattern, "password") {
+			name = "wsl-backup-orchestrator-password-001.txt"
+		}
+		path := filepath.Join(os.TempDir(), name)
+		file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
+		if err != nil {
+			return nil, err
+		}
+		return file, nil
+	}
+	t.Cleanup(func() {
+		osCreateTemp = originalCreateTemp
+		_ = os.Remove(filepath.Join(os.TempDir(), "wsl-backup-orchestrator-rule-001.txt"))
+		_ = os.Remove(filepath.Join(os.TempDir(), "wsl-backup-orchestrator-rule-002.txt"))
+		_ = os.Remove(filepath.Join(os.TempDir(), "wsl-backup-orchestrator-password-001.txt"))
+	})
+	fakeExec.runCapture["wslpath -w "+filepath.Join(os.TempDir(), "wsl-backup-orchestrator-password-001.txt")] = "C:\\rules\\backup-password.txt"
+
+	err := HandleWith(context.Background(), []string{"daily", "--dry-run"}, runner, RunDependencies{Loader: loader, Stat: os.Stat, System: fakeExec})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	wslSawDryRun := false
+	wslSnapshotsSawDryRun := false
+	for _, call := range runner.calls {
+		joined := strings.Join(call, " ")
+		if strings.Contains(joined, " backup ") && strings.Contains(joined, wslRepo) {
+			if !strings.Contains(joined, "--dry-run") {
+				t.Fatalf("expected wsl backup to include --dry-run, got %v", call)
+			}
+			wslSawDryRun = true
+		}
+		if strings.HasPrefix(joined, "snapshots --repo ") && strings.Contains(joined, "--dry-run") {
+			wslSnapshotsSawDryRun = true
+		}
+	}
+	if !wslSawDryRun {
+		t.Fatalf("expected wsl backup call")
+	}
+	if wslSnapshotsSawDryRun {
+		t.Fatalf("did not expect snapshots command to include --dry-run")
+	}
+
+	if len(fakeExec.runCalls) != 1 {
+		t.Fatalf("expected one windows run call, got %d", len(fakeExec.runCalls))
+	}
+	windowsCall := strings.Join(fakeExec.runCalls[0], " ")
+	if !strings.Contains(windowsCall, " backup ") || !strings.Contains(windowsCall, "--dry-run") {
+		t.Fatalf("expected windows backup to include --dry-run, got %v", fakeExec.runCalls[0])
+	}
+}
+
 func TestHandleFailsWhenIncludeRulesMissing(t *testing.T) {
 	rulesDir := withTempRules(t, "daily", []string{}, []string{})
 	wslRepo := withTempRepository(t)
 	runner := &fakeRunner{}
 	loader := fakeLoader{cfg: config.File{
-		Profiles: map[string]config.Profile{"wsl": {Repository: wslRepo}},
+		Profiles: map[string]config.Profile{"wsl": testProfile(wslRepo)},
 	}}
 	loader.cfgPathSetForTest(rulesDir)
 
@@ -318,7 +426,7 @@ func TestHandleFailsWhenPasswordMissing(t *testing.T) {
 	wslRepo := withTempRepository(t)
 	runner := &fakeRunner{}
 	loader := fakeLoader{cfg: config.File{
-		Profiles: map[string]config.Profile{"wsl": {Repository: wslRepo}},
+		Profiles: map[string]config.Profile{"wsl": testProfile(wslRepo)},
 	}}
 	loader.cfgPathSetForTest(rulesDir)
 	t.Setenv("RESTIC_PASSWORD", "")
@@ -337,7 +445,7 @@ func TestHandlePromptsForPasswordWhenRepositoryExists(t *testing.T) {
 	wslRepo := withTempRepository(t)
 	runner := &fakeRunner{}
 	loader := fakeLoader{cfg: config.File{
-		Profiles: map[string]config.Profile{"wsl": {Repository: wslRepo}},
+		Profiles: map[string]config.Profile{"wsl": testProfile(wslRepo)},
 	}}
 	loader.cfgPathSetForTest(rulesDir)
 	t.Setenv("RESTIC_PASSWORD", "")
@@ -376,7 +484,7 @@ func TestHandleFailsWhenPasswordPromptFails(t *testing.T) {
 	wslRepo := withTempRepository(t)
 	runner := &fakeRunner{}
 	loader := fakeLoader{cfg: config.File{
-		Profiles: map[string]config.Profile{"wsl": {Repository: wslRepo}},
+		Profiles: map[string]config.Profile{"wsl": testProfile(wslRepo)},
 	}}
 	loader.cfgPathSetForTest(rulesDir)
 	t.Setenv("RESTIC_PASSWORD", "")
@@ -402,7 +510,7 @@ func TestHandlePromptsForPasswordBeforeRepositoryInit(t *testing.T) {
 	missingRepo := filepath.Join(t.TempDir(), "missing-repo")
 	loader := fakeLoader{cfg: config.File{
 		Profiles: map[string]config.Profile{
-			"wsl": {Repository: missingRepo},
+			"wsl": testProfile(missingRepo),
 		},
 	}}
 	loader.cfgPathSetForTest(rulesDir)
@@ -441,8 +549,8 @@ func TestHandleFailsWhenProfilesShareNormalizedRepository(t *testing.T) {
 	runner := &fakeRunner{}
 	loader := fakeLoader{cfg: config.File{
 		Profiles: map[string]config.Profile{
-			"wsl":     {Repository: "/mnt/c/backups/shared"},
-			"windows": {Repository: `C:\backups\shared`},
+			"wsl":     testProfile("/mnt/c/backups/shared"),
+			"windows": testProfile(`C:\backups\shared`),
 		},
 	}}
 	loader.cfgPathSetForTest(rulesDir)
@@ -451,7 +559,7 @@ func TestHandleFailsWhenProfilesShareNormalizedRepository(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error")
 	}
-	if !strings.Contains(err.Error(), "target the same repository after normalization") {
+	if !strings.Contains(err.Error(), "target the same daily repository after normalization") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -463,7 +571,7 @@ func TestHandleOffersRepositoryCreation(t *testing.T) {
 	runner := &fakeRunner{}
 	loader := fakeLoader{cfg: config.File{
 		Profiles: map[string]config.Profile{
-			"wsl": {Repository: filepath.Join(t.TempDir(), "missing-repo")},
+			"wsl": testProfile(filepath.Join(t.TempDir(), "missing-repo")),
 		},
 	}}
 	loader.cfgPathSetForTest(rulesDir)
@@ -492,6 +600,91 @@ func TestHandleOffersRepositoryCreation(t *testing.T) {
 	}
 }
 
+func TestHandleOffersInactiveCadenceRepositoryCreationUpFront(t *testing.T) {
+	t.Setenv("RESTIC_PASSWORD", "test-password")
+
+	rulesDir := withTempRules(t, "daily", []string{"wsl"}, []string{"wsl"})
+	runner := &fakeRunner{}
+	dailyRepo := withTempRepository(t)
+	monthlyRepo := withTempRepository(t)
+	weeklyRepo := filepath.Join(t.TempDir(), "weekly-missing-repo")
+	loader := fakeLoader{cfg: config.File{
+		Profiles: map[string]config.Profile{
+			"wsl": testProfileRepositories(dailyRepo, weeklyRepo, monthlyRepo),
+		},
+	}}
+	loader.cfgPathSetForTest(rulesDir)
+
+	confirmedPrompts := []string{}
+	err := HandleWith(context.Background(), []string{"daily"}, runner, RunDependencies{
+		Loader: loader,
+		Stat:   os.Stat,
+		Confirm: func(message string) (bool, error) {
+			confirmedPrompts = append(confirmedPrompts, message)
+			return true, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if len(confirmedPrompts) != 1 {
+		t.Fatalf("expected one prompt for missing inactive cadence repository, got %d (%v)", len(confirmedPrompts), confirmedPrompts)
+	}
+	if !strings.Contains(confirmedPrompts[0], "cadence weekly") {
+		t.Fatalf("expected weekly cadence in prompt, got %q", confirmedPrompts[0])
+	}
+	if len(runner.calls) < 1 {
+		t.Fatalf("expected runner calls")
+	}
+	initCall := strings.Join(runner.calls[0], " ")
+	if !strings.Contains(initCall, "init --repo") || !strings.Contains(initCall, weeklyRepo) {
+		t.Fatalf("expected first runner call to initialize missing weekly repository, got %v", runner.calls[0])
+	}
+	backupCallSeen := false
+	for _, call := range runner.calls {
+		joined := strings.Join(call, " ")
+		if strings.Contains(joined, dailyRepo) && strings.Contains(joined, " backup ") {
+			backupCallSeen = true
+		}
+	}
+	if !backupCallSeen {
+		t.Fatalf("expected daily backup to run after inactive cadence validation")
+	}
+}
+
+func TestHandleExitsWhenInactiveCadenceRepositoryCreationDeclined(t *testing.T) {
+	t.Setenv("RESTIC_PASSWORD", "test-password")
+
+	rulesDir := withTempRules(t, "daily", []string{"wsl"}, []string{"wsl"})
+	runner := &fakeRunner{}
+	dailyRepo := withTempRepository(t)
+	monthlyRepo := withTempRepository(t)
+	weeklyRepo := filepath.Join(t.TempDir(), "weekly-missing-repo")
+	loader := fakeLoader{cfg: config.File{
+		Profiles: map[string]config.Profile{
+			"wsl": testProfileRepositories(dailyRepo, weeklyRepo, monthlyRepo),
+		},
+	}}
+	loader.cfgPathSetForTest(rulesDir)
+
+	err := HandleWith(context.Background(), []string{"daily"}, runner, RunDependencies{
+		Loader: loader,
+		Stat:   os.Stat,
+		Confirm: func(string) (bool, error) {
+			return false, nil
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(err.Error(), "profile wsl weekly repository missing") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("expected no runner calls when inactive cadence repository creation is declined, got %v", runner.calls)
+	}
+}
+
 func TestHandleOffersWindowsRepositoryCreationWithPasswordFile(t *testing.T) {
 	t.Setenv("RESTIC_PASSWORD", "test-password")
 
@@ -501,7 +694,11 @@ func TestHandleOffersWindowsRepositoryCreationWithPasswordFile(t *testing.T) {
 	loader := fakeLoader{cfg: config.File{
 		ResticVersion: "0.18.1",
 		Profiles: map[string]config.Profile{
-			"windows": {Repository: `C:\\missing\\repo`, UseFSSnapshot: false},
+			"windows": func() config.Profile {
+				profile := testProfile(`C:\missing\repo`)
+				profile.UseFSSnapshot = false
+				return profile
+			}(),
 		},
 	}}
 	loader.cfgPathSetForTest(rulesDir)
@@ -592,8 +789,12 @@ func TestHandleReturnsProfileErrorWhenOneConcurrentRunFails(t *testing.T) {
 	loader := fakeLoader{cfg: config.File{
 		ResticVersion: "0.18.1",
 		Profiles: map[string]config.Profile{
-			"windows": {Repository: `C:\repo\windows`, UseFSSnapshot: false},
-			"wsl":     {Repository: wslRepo, UseFSSnapshot: false},
+			"windows": func() config.Profile {
+				profile := testProfile(`C:\repo\windows`)
+				profile.UseFSSnapshot = false
+				return profile
+			}(),
+			"wsl": func() config.Profile { profile := testProfile(wslRepo); profile.UseFSSnapshot = false; return profile }(),
 		},
 	}}
 	loader.cfgPathSetForTest(rulesDir)
@@ -680,8 +881,12 @@ func TestHandleRunsProfilesConcurrently(t *testing.T) {
 	loader := fakeLoader{cfg: config.File{
 		ResticVersion: "0.18.1",
 		Profiles: map[string]config.Profile{
-			"windows": {Repository: windowsRepo, UseFSSnapshot: false},
-			"wsl":     {Repository: wslRepo, UseFSSnapshot: false},
+			"windows": func() config.Profile {
+				profile := testProfile(windowsRepo)
+				profile.UseFSSnapshot = false
+				return profile
+			}(),
+			"wsl": func() config.Profile { profile := testProfile(wslRepo); profile.UseFSSnapshot = false; return profile }(),
 		},
 	}}
 	loader.cfgPathSetForTest(rulesDir)
@@ -757,7 +962,7 @@ func TestHandlePrintsProfilePrefix(t *testing.T) {
 	loader := fakeLoader{cfg: config.File{
 		ResticVersion: "0.18.1",
 		Profiles: map[string]config.Profile{
-			"wsl": {Repository: wslRepo},
+			"wsl": testProfile(wslRepo),
 		},
 	}}
 	loader.cfgPathSetForTest(rulesDir)
@@ -786,7 +991,7 @@ func (l *fakeLoader) cfgPathSetForTest(dir string) {
 }
 
 func TestBuildRunArgsErrorsOnUnexpectedExcludeStatFailure(t *testing.T) {
-	_, err := buildRunArgs("/cfg", "wsl", config.Profile{Repository: "/repo"}, "daily", nil, func(path string) (os.FileInfo, error) {
+	_, err := buildRunArgs("/cfg", "wsl", testProfile("/repo"), "daily", nil, func(path string) (os.FileInfo, error) {
 		if strings.Contains(path, "includes.") {
 			return fakeFileInfo{}, nil
 		}
@@ -803,7 +1008,7 @@ func TestBuildRunArgsErrorsOnUnexpectedExcludeStatFailure(t *testing.T) {
 func TestBuildRunArgsWeeklyIncludesDailyAndWeeklyRuleFiles(t *testing.T) {
 	rulesDir := withTempRules(t, "weekly", []string{"wsl"}, []string{"wsl"})
 
-	args, err := buildRunArgs(rulesDir, "wsl", config.Profile{Repository: "/repo"}, "weekly", nil, os.Stat)
+	args, err := buildRunArgs(rulesDir, "wsl", testProfile("/repo"), "weekly", nil, os.Stat)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -823,7 +1028,7 @@ func TestBuildRunArgsWeeklyIncludesDailyAndWeeklyRuleFiles(t *testing.T) {
 func TestBuildRunArgsMonthlyIncludesDailyWeeklyAndMonthlyRuleFiles(t *testing.T) {
 	rulesDir := withTempRules(t, "monthly", []string{"wsl"}, []string{"wsl"})
 
-	args, err := buildRunArgs(rulesDir, "wsl", config.Profile{Repository: "/repo"}, "monthly", nil, os.Stat)
+	args, err := buildRunArgs(rulesDir, "wsl", testProfile("/repo"), "monthly", nil, os.Stat)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
